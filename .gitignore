@@ -45,3 +45,6 @@ next-env.d.ts
 # local sqlite artifacts (pre-Postgres dev only)
 *.db
 *.db-journal
+
+.vercel
+.env*
