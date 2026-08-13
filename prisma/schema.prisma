@@ -51,3 +51,14 @@ model Admin {
   password  String
   createdAt DateTime @default(now())
 }
+
+model Lead {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  company   String?
+  budget    String?
+  message   String
+  status    String   @default("New")
+  createdAt DateTime @default(now())
+}
