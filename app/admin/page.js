@@ -44,7 +44,10 @@ export default async function AdminPage() {
             <div className="eyebrow">Aerion Admin</div>
             <h1>Clients</h1>
           </div>
-          <SignOutButton />
+          <div style={{ display: "flex", gap: 12 }}>
+            <Link href="/admin/leads" className="btn btn-secondary">Leads</Link>
+            <SignOutButton />
+          </div>
         </div>
 
         <div className="grid grid-2" style={{ alignItems: "start", gap: 32 }}>
