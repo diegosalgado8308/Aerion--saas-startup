@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import SignOutButton from "@/components/SignOutButton";
 
 export default function Header({ session }) {
@@ -13,7 +14,7 @@ export default function Header({ session }) {
     <header className="app-header">
       <div className="container">
         <Link href={session ? "/dashboard" : "/"} className="brand">
-          <span className="brand-mark">A</span>
+          <Image src="/logo-icon.png" alt="" width={30} height={30} className="brand-mark" priority />
           Aerion Software
         </Link>
 

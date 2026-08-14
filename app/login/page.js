@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { redirect } from "next/navigation";
 import { AuthError } from "next-auth";
 import { signIn } from "@/lib/auth";
@@ -28,6 +29,7 @@ export default async function LoginPage({ searchParams }) {
 
   return (
     <div className="auth-shell">
+      <Image src="/logo-icon.png" alt="Aerion Software" width={56} height={56} className="auth-logo" priority />
       <h1>Welcome back</h1>
       <p className="text-muted" style={{ marginTop: 6, marginBottom: 24 }}>Log in to your workspace.</p>
 

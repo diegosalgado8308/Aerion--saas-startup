@@ -14,5 +14,11 @@ export default auth((req) => {
 });
 
 export const config = {
-  matcher: ["/((?!api/auth|api/cron|_next/static|_next/image|favicon.ico).*)"],
+  // `.*\.\w+$` excludes any request for an actual static file (logo-icon.png,
+  // robots.txt, the generated favicon route, etc.) — not just the specific
+  // favicon.ico this used to special-case. Without this, a static asset
+  // referenced by a *public* page (login/signup/landing) gets 302-redirected
+  // to /login for logged-out visitors instead of served, which silently
+  // breaks image rendering there rather than erroring loudly.
+  matcher: ["/((?!api/auth|api/cron|_next/static|_next/image|.*\\.\\w+$).*)"],
 };

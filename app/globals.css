@@ -157,13 +157,8 @@ h3 { font-size: 1.1rem; }
   width: 30px;
   height: 30px;
   border-radius: 8px;
-  background: linear-gradient(135deg, var(--accent), #a855f7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  font-weight: 800;
-  font-size: 0.9rem;
+  object-fit: cover;
+  flex-shrink: 0;
 }
 
 .header-nav {
@@ -277,6 +272,11 @@ h3 { font-size: 1.1rem; }
   max-width: 400px;
   margin: 64px auto;
   padding: 0 24px;
+}
+
+.auth-logo {
+  border-radius: 12px;
+  margin-bottom: 20px;
 }
 
 .field {
