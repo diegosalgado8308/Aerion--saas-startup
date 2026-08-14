@@ -68,6 +68,9 @@ model Project {
   description String?
   createdAt   DateTime  @default(now())
 
+  goalFramework    String?
+  goalStageValues  Json    @default("{}")
+
   workspaceId String
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 

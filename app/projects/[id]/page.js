@@ -2,10 +2,11 @@ import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import Link from "next/link";
 import { auth } from "@/lib/auth";
-import { getProjectForWorkspace, deleteProject } from "@/lib/projects";
+import { getProjectForWorkspace, deleteProject, setProjectGoalFramework, updateProjectGoalStages } from "@/lib/projects";
 import { createTask, updateTaskStatus, deleteTask } from "@/lib/tasks";
 import { getWorkspaceMembers } from "@/lib/workspace";
 import { ValidationError } from "@/lib/workspace";
+import { GOAL_FRAMEWORKS, GOAL_FRAMEWORK_KEYS } from "@/lib/goalFrameworks";
 import Toast from "@/components/Toast";
 import FormattedDate from "@/components/FormattedDate";
 import LivePoll from "@/components/LivePoll";
@@ -91,6 +92,35 @@ export default async function ProjectBoardPage({ params, searchParams }) {
     redirect("/dashboard");
   }
 
+  async function handleSetGoalFramework(formData) {
+    "use server";
+    const session = await auth();
+    try {
+      await setProjectGoalFramework(id, session.user.workspaceId, formData.get("frameworkKey") || null);
+      revalidatePath(`/projects/${id}`);
+    } catch (err) {
+      if (err instanceof ValidationError) {
+        redirect(`/projects/${id}?error=${encodeURIComponent(err.message)}`);
+      }
+      throw err;
+    }
+  }
+
+  async function handleUpdateGoalStages(stageKeys, formData) {
+    "use server";
+    const session = await auth();
+    try {
+      const values = Object.fromEntries(stageKeys.map((key) => [key, formData.get(key)]));
+      await updateProjectGoalStages(id, session.user.workspaceId, values);
+      revalidatePath(`/projects/${id}`);
+    } catch (err) {
+      if (err instanceof ValidationError) {
+        redirect(`/projects/${id}?error=${encodeURIComponent(err.message)}`);
+      }
+      throw err;
+    }
+  }
+
   return (
     <div className="container page">
       <div className="page-head">
@@ -120,6 +150,59 @@ export default async function ProjectBoardPage({ params, searchParams }) {
           Showing the first {project.tasks.length} of {project.taskTotal} tasks. Complete or archive some to see the rest.
         </div>
       )}
+
+      <div className="card" style={{ marginBottom: 32 }}>
+        <h3 style={{ marginBottom: 4 }}>Goal framework</h3>
+        {project.goalFramework ? (
+          <>
+            <p className="text-muted" style={{ fontSize: "0.85rem", marginBottom: 16 }}>
+              This project is using <strong>{GOAL_FRAMEWORKS[project.goalFramework].label}</strong>.
+            </p>
+            <form action={handleUpdateGoalStages.bind(null, GOAL_FRAMEWORKS[project.goalFramework].stages.map((s) => s.key))}>
+              {GOAL_FRAMEWORKS[project.goalFramework].stages.map((stage) => (
+                <div className="field" key={stage.key}>
+                  <label htmlFor={`stage-${stage.key}`}>{stage.label}</label>
+                  <textarea
+                    id={`stage-${stage.key}`}
+                    name={stage.key}
+                    defaultValue={project.goalStageValues?.[stage.key] || ""}
+                  />
+                </div>
+              ))}
+              <button type="submit" className="btn btn-primary">Save goal plan</button>
+            </form>
+
+            <div style={{ display: "flex", gap: 12, marginTop: 20, paddingTop: 20, borderTop: "1px solid var(--border)", flexWrap: "wrap" }}>
+              <form action={handleSetGoalFramework} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <select name="frameworkKey" defaultValue={project.goalFramework} style={{ width: "auto" }}>
+                  {GOAL_FRAMEWORK_KEYS.map((key) => (
+                    <option key={key} value={key}>{GOAL_FRAMEWORKS[key].label}</option>
+                  ))}
+                </select>
+                <button type="submit" className="btn btn-secondary btn-sm">Switch framework</button>
+              </form>
+              <form action={handleSetGoalFramework}>
+                <button type="submit" className="btn btn-danger btn-sm">Clear framework</button>
+              </form>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="text-muted" style={{ fontSize: "0.85rem", marginBottom: 16 }}>
+              Adopt a structured framework to plan this project&apos;s goal.
+            </p>
+            <form action={handleSetGoalFramework} style={{ display: "flex", gap: 8 }}>
+              <select name="frameworkKey" defaultValue="" required style={{ width: "auto" }}>
+                <option value="" disabled>Choose a framework</option>
+                {GOAL_FRAMEWORK_KEYS.map((key) => (
+                  <option key={key} value={key}>{GOAL_FRAMEWORKS[key].label}</option>
+                ))}
+              </select>
+              <button type="submit" className="btn btn-primary">Set framework</button>
+            </form>
+          </>
+        )}
+      </div>
 
       <div className="card" style={{ marginBottom: 32 }}>
         <h3 style={{ marginBottom: 16 }}>New task</h3>
