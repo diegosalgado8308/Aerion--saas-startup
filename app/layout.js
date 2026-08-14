@@ -1,4 +1,5 @@
 import "./globals.css";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import Header from "@/components/Header";
 import { auth } from "@/lib/auth";
 
@@ -18,6 +19,7 @@ export default async function RootLayout({ children }) {
       <body>
         <Header session={session} />
         <main>{children}</main>
+        <SpeedInsights />
       </body>
     </html>
   );

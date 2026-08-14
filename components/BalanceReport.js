@@ -1,4 +1,11 @@
 const RESOURCE_DIRECTION_COLOR = { growing: "#3fbf82", shrinking: "#e5484d", stable: "#6b7285", idle: "#6b7285" };
+const SEVERITY_LABEL = { severe: "Severe", moderate: "Moderate", minor: "Minor" };
+const SEVERITY_COLOR = { severe: "#e5484d", moderate: "#f0a63a", minor: "#6b7285" };
+const CAUSE_EXPLANATION = {
+  starved: "the source can't supply it fast enough",
+  capped: "the destination doesn't have room to receive it",
+  mixed: "supply and capacity are both limiting it",
+};
 
 export default function BalanceReport({ nodes, balance }) {
   const nodesById = new Map(nodes.map((n) => [n.id, n]));
@@ -48,9 +55,11 @@ export default function BalanceReport({ nodes, balance }) {
         <ul style={{ fontSize: "0.85rem", lineHeight: 1.7, paddingLeft: 20, margin: 0 }}>
           {balance.bottlenecks.map((b) => (
             <li key={b.connectionId}>
-              <strong>Bottleneck:</strong> {nodeName(b.fromNodeId)} &rarr; {nodeName(b.toNodeId)} only delivered{" "}
+              <strong>Bottleneck</strong>{" "}
+              <span style={{ color: SEVERITY_COLOR[b.severity] }}>({SEVERITY_LABEL[b.severity]})</span>:{" "}
+              {nodeName(b.fromNodeId)} &rarr; {nodeName(b.toNodeId)} only delivered{" "}
               {Math.round((1 - b.shortfallRatio) * 100)}% of requested flow ({Math.round(b.transferred).toLocaleString()} of{" "}
-              {Math.round(b.requested).toLocaleString()}).
+              {Math.round(b.requested).toLocaleString()}) — {CAUSE_EXPLANATION[b.cause]}.
             </li>
           ))}
           {balance.saturatedNodes.map((s) => (
