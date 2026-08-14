@@ -2,7 +2,8 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getWorkspaceMembers, removeMember, ValidationError } from "@/lib/workspace";
+import { getWorkspaceMembers, removeMember, buildInviteUrl, ValidationError } from "@/lib/workspace";
+import { sendInviteEmail } from "@/lib/email";
 
 export const metadata = { title: "Team" };
 
@@ -10,6 +11,7 @@ export default async function TeamPage({ searchParams }) {
   const session = await auth();
   const sp = await searchParams;
   const errorMessage = sp?.error ? decodeURIComponent(sp.error) : null;
+  const sentEmail = sp?.sent ? decodeURIComponent(sp.sent) : null;
 
   const workspace = await prisma.workspace.findUnique({ where: { id: session.user.workspaceId } });
   const members = await getWorkspaceMembers(session.user.workspaceId);
@@ -35,6 +37,38 @@ export default async function TeamPage({ searchParams }) {
     }
   }
 
+  async function handleInviteByEmail(formData) {
+    "use server";
+    const session = await auth();
+    const email = (formData.get("email") || "").toString().trim();
+
+    if (session.user.role !== "OWNER") {
+      redirect(`/team?error=${encodeURIComponent("Only the workspace owner can send invites.")}`);
+    }
+    if (!email) {
+      redirect(`/team?error=${encodeURIComponent("Email is required.")}`);
+    }
+
+    const workspace = await prisma.workspace.findUnique({ where: { id: session.user.workspaceId } });
+
+    let failed = false;
+    try {
+      await sendInviteEmail({
+        to: email,
+        inviterName: session.user.name,
+        workspaceName: workspace.name,
+        inviteUrl: buildInviteUrl(workspace),
+      });
+    } catch {
+      failed = true;
+    }
+
+    if (failed) {
+      redirect(`/team?error=${encodeURIComponent("Couldn't send the invite email — check RESEND_API_KEY is set.")}`);
+    }
+    redirect(`/team?sent=${encodeURIComponent(email)}`);
+  }
+
   return (
     <div className="container page">
       <div className="page-head">
@@ -45,6 +79,7 @@ export default async function TeamPage({ searchParams }) {
       </div>
 
       {errorMessage && <div className="notice notice-error">{errorMessage}</div>}
+      {sentEmail && <div className="notice notice-success">Invite sent to {sentEmail}.</div>}
 
       {isOwner && (
         <div className="card" style={{ marginBottom: 32 }}>
@@ -58,6 +93,17 @@ export default async function TeamPage({ searchParams }) {
           <p className="form-note" style={{ textAlign: "left", marginTop: 10 }}>
             They&apos;ll enter it at <strong>{inviteUrl}</strong> during sign up.
           </p>
+
+          <div style={{ marginTop: 20, paddingTop: 20, borderTop: "1px solid var(--border)" }}>
+            <h4 style={{ marginBottom: 10, fontSize: "0.9rem" }}>Or invite by email</h4>
+            <form action={handleInviteByEmail} className="inline-form">
+              <div className="field">
+                <label htmlFor="inviteEmail">Email</label>
+                <input type="email" id="inviteEmail" name="email" placeholder="teammate@example.com" required />
+              </div>
+              <button type="submit" className="btn btn-primary btn-sm">Send invite</button>
+            </form>
+          </div>
         </div>
       )}
 

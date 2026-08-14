@@ -111,7 +111,7 @@ export default async function SignupPage({ searchParams }) {
           </div>
           <div className="field">
             <label htmlFor="inviteCode">Invite code</label>
-            <input type="text" id="inviteCode" name="inviteCode" placeholder="Paste the code from your teammate" required />
+            <input type="text" id="inviteCode" name="inviteCode" placeholder="Paste the code from your teammate" defaultValue={params?.code || ""} required />
           </div>
           <button type="submit" className="btn btn-primary btn-block">Join workspace</button>
         </form>
