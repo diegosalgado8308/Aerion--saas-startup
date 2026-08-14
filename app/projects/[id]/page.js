@@ -8,6 +8,7 @@ import { getWorkspaceMembers } from "@/lib/workspace";
 import { ValidationError } from "@/lib/workspace";
 import Toast from "@/components/Toast";
 import FormattedDate from "@/components/FormattedDate";
+import LivePoll from "@/components/LivePoll";
 
 export async function generateMetadata({ params }) {
   const { id } = await params;
@@ -95,7 +96,12 @@ export default async function ProjectBoardPage({ params, searchParams }) {
       <div className="page-head">
         <div>
           <Link href="/dashboard" className="text-faint" style={{ fontSize: "0.85rem" }}>&larr; All projects</Link>
-          <h1 style={{ marginTop: 8 }}>{project.name}</h1>
+          <h1 style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 10 }}>
+            {project.name}
+            <span className="live-indicator" title="This board updates automatically — no need to refresh">
+              <span className="live-dot" /> Live
+            </span>
+          </h1>
           {project.description && <p className="text-muted">{project.description}</p>}
         </div>
         <div style={{ display: "flex", gap: 12 }}>
@@ -107,6 +113,7 @@ export default async function ProjectBoardPage({ params, searchParams }) {
       </div>
 
       <Toast key={errorMessage ? crypto.randomUUID() : "no-error"} message={errorMessage} type="error" />
+      <LivePoll />
 
       {project.tasksTruncated && (
         <div className="notice notice-error" style={{ background: "var(--surface-2)", color: "var(--text-muted)", borderColor: "var(--border)" }}>

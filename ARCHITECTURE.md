@@ -6,9 +6,10 @@ Engineering reference for how Aerion Software is put together: the layers reques
 
 ### 1. Presentation (App Router UI)
 
-- Next.js 16 App Router under `app/`, mixing React Server Components (default) with the client components under `components/` (`Header`, `SignOutButton`, `EconomyDiagramView`, `SimulationChart`, `BalanceReport`, `DiagramExportButtons`, `Toast`, `FormattedDate`).
+- Next.js 16 App Router under `app/`, mixing React Server Components (default) with the client components under `components/` (`Header`, `SignOutButton`, `EconomyDiagramView`, `SimulationChart`, `BalanceReport`, `DiagramExportButtons`, `Toast`, `FormattedDate`, `LivePoll`).
 - Pages are `async` Server Components that fetch their own data directly (`app/dashboard/page.js`, `app/projects/[id]/economy/[diagramId]/page.js`, etc.) — no client-side data-fetching layer sits in front of them.
 - One-time action feedback (`?error=`/`?sent=` query params set by a redirecting Server Action) renders via `<Toast>`, not a static page banner. Every page passes a server-generated `key={crypto.randomUUID()}` alongside the message — without it, two identical error strings in a row (e.g. retrying a failed login) wouldn't remount the component, so the already-dismissed/expired toast from the first occurrence would just stay hidden on the second.
+- `<LivePoll>` (`app/projects/[id]/page.js` only, so far) calls `router.refresh()` on a 5s interval, pausing while the tab is hidden — the app's stand-in for real-time multiplayer collaboration, since Vercel's serverless model has no long-lived connection to push updates through. `router.refresh()` re-fetches the Server Component tree's data but preserves client-side state (e.g. text already typed into the "new task" field), so a background poll doesn't clobber in-progress input.
 
 ### 2. Routing & request gating
 
