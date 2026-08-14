@@ -1,0 +1,37 @@
+{
+  "name": "aerion-software",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "test": "vitest run",
+    "postinstall": "prisma generate"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.1.0",
+    "@prisma/adapter-neon": "^7.9.1",
+    "@prisma/client": "^7.9.1",
+    "bcryptjs": "^3.0.3",
+    "next": "16.3.0",
+    "next-auth": "^5.0.0-beta.32",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "ws": "^8.21.3"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.1",
+    "dotenv": "^17.4.2",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.0",
+    "prisma": "^7.9.1",
+    "vitest": "^4.1.10"
+  },
+  "allowScripts": {
+    "unrs-resolver@1.12.2": true,
+    "prisma@7.9.1": true,
+    "@prisma/engines@7.9.1": true
+  }
+}

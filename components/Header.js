@@ -1,0 +1,46 @@
+import Link from "next/link";
+import SignOutButton from "@/components/SignOutButton";
+
+export default function Header({ session }) {
+  const initials = session?.user?.name
+    ?.split(" ")
+    .map((p) => p[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+
+  return (
+    <header className="app-header">
+      <div className="container">
+        <Link href={session ? "/dashboard" : "/"} className="brand">
+          <span className="brand-mark">A</span>
+          Aerion Software
+        </Link>
+
+        {session && (
+          <nav className="header-nav">
+            <Link href="/dashboard">Projects</Link>
+            <Link href="/team">Team</Link>
+          </nav>
+        )}
+
+        <div className="header-actions">
+          {session ? (
+            <>
+              <div className="user-chip">
+                <span className="avatar-sm">{initials}</span>
+                {session.user.name}
+              </div>
+              <SignOutButton />
+            </>
+          ) : (
+            <>
+              <Link href="/login" className="btn btn-secondary btn-sm">Log in</Link>
+              <Link href="/signup" className="btn btn-primary btn-sm">Sign up</Link>
+            </>
+          )}
+        </div>
+      </div>
+    </header>
+  );
+}

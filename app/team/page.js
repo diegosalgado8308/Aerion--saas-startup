@@ -1,0 +1,97 @@
+import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { getWorkspaceMembers, removeMember, ValidationError } from "@/lib/workspace";
+
+export const metadata = { title: "Team" };
+
+export default async function TeamPage({ searchParams }) {
+  const session = await auth();
+  const sp = await searchParams;
+  const errorMessage = sp?.error ? decodeURIComponent(sp.error) : null;
+
+  const workspace = await prisma.workspace.findUnique({ where: { id: session.user.workspaceId } });
+  const members = await getWorkspaceMembers(session.user.workspaceId);
+  const isOwner = session.user.role === "OWNER";
+
+  const inviteUrl = `/signup?mode=join`;
+
+  async function handleRemove(formData) {
+    "use server";
+    const session = await auth();
+    try {
+      await removeMember({
+        workspaceId: session.user.workspaceId,
+        actingUserId: session.user.id,
+        targetUserId: formData.get("userId"),
+      });
+      revalidatePath("/team");
+    } catch (err) {
+      if (err instanceof ValidationError) {
+        redirect(`/team?error=${encodeURIComponent(err.message)}`);
+      }
+      throw err;
+    }
+  }
+
+  return (
+    <div className="container page">
+      <div className="page-head">
+        <div>
+          <h1>Team</h1>
+          <p className="text-muted">{workspace.name}</p>
+        </div>
+      </div>
+
+      {errorMessage && <div className="notice notice-error">{errorMessage}</div>}
+
+      {isOwner && (
+        <div className="card" style={{ marginBottom: 32 }}>
+          <h3 style={{ marginBottom: 12 }}>Invite teammates</h3>
+          <p className="text-muted" style={{ marginBottom: 12, fontSize: "0.88rem" }}>
+            Share this invite code — anyone who signs up with it joins {workspace.name} as a member.
+          </p>
+          <div className="invite-box">
+            <code>{workspace.inviteCode}</code>
+          </div>
+          <p className="form-note" style={{ textAlign: "left", marginTop: 10 }}>
+            They&apos;ll enter it at <strong>{inviteUrl}</strong> during sign up.
+          </p>
+        </div>
+      )}
+
+      <div className="table-card">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Role</th>
+              {isOwner && <th></th>}
+            </tr>
+          </thead>
+          <tbody>
+            {members.map((member) => (
+              <tr key={member.id}>
+                <td>{member.name}</td>
+                <td className="text-muted">{member.email}</td>
+                <td><span className="role-badge">{member.role}</span></td>
+                {isOwner && (
+                  <td>
+                    {member.id !== session.user.id && (
+                      <form action={handleRemove}>
+                        <input type="hidden" name="userId" value={member.id} />
+                        <button type="submit" className="btn btn-danger btn-sm">Remove</button>
+                      </form>
+                    )}
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}

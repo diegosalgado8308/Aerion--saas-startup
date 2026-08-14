@@ -1,0 +1,50 @@
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { AuthError } from "next-auth";
+import { signIn } from "@/lib/auth";
+
+export const metadata = { title: "Log in" };
+
+export default async function LoginPage({ searchParams }) {
+  const params = await searchParams;
+  const hasError = params?.error === "1";
+
+  async function handleLogin(formData) {
+    "use server";
+    try {
+      await signIn("credentials", {
+        email: formData.get("email"),
+        password: formData.get("password"),
+        redirectTo: "/dashboard",
+      });
+    } catch (err) {
+      if (err instanceof AuthError) {
+        redirect("/login?error=1");
+      }
+      throw err;
+    }
+  }
+
+  return (
+    <div className="auth-shell">
+      <h1>Welcome back</h1>
+      <p className="text-muted" style={{ marginTop: 6, marginBottom: 24 }}>Log in to your workspace.</p>
+
+      {hasError && <div className="notice notice-error">Invalid email or password.</div>}
+
+      <form action={handleLogin}>
+        <div className="field">
+          <label htmlFor="email">Email</label>
+          <input type="email" id="email" name="email" required />
+        </div>
+        <div className="field">
+          <label htmlFor="password">Password</label>
+          <input type="password" id="password" name="password" required />
+        </div>
+        <button type="submit" className="btn btn-primary btn-block">Log in</button>
+      </form>
+
+      <p className="form-note">Don&apos;t have an account? <Link href="/signup">Sign up</Link></p>
+    </div>
+  );
+}
