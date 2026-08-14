@@ -43,7 +43,7 @@ export default function EconomyDiagramView({ nodes, connections }) {
 
   return (
     <div className="diagram-scroll">
-      <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Economy diagram">
+      <svg id="economy-diagram-svg" width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Economy diagram">
         <defs>
           <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
             <path d="M0,0 L10,5 L0,10 z" fill="#6b7285" />

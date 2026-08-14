@@ -21,6 +21,7 @@ import { ValidationError } from "@/lib/workspace";
 import EconomyDiagramView, { ECONOMY_TYPE_COLOR } from "@/components/EconomyDiagramView";
 import SimulationChart from "@/components/SimulationChart";
 import BalanceReport from "@/components/BalanceReport";
+import DiagramExportButtons from "@/components/DiagramExportButtons";
 
 export async function generateMetadata({ params }) {
   const { diagramId } = await params;
@@ -217,8 +218,9 @@ export default async function EconomyDiagramPage({ params, searchParams }) {
 
       {errorMessage && <div className="notice notice-error">{errorMessage}</div>}
 
-      <div className="section-head" style={{ marginBottom: 16 }}>
+      <div className="section-head" style={{ marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h2 style={{ fontSize: "1.2rem" }}>Diagram</h2>
+        <DiagramExportButtons jsonExportUrl={`/api/economy/${diagramId}/export`} diagramName={diagram.name} />
       </div>
       <div style={{ marginBottom: 32 }}>
         <EconomyDiagramView nodes={visibleNodes} connections={visibleConnections} />
