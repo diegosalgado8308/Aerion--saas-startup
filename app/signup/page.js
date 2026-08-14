@@ -70,7 +70,7 @@ export default async function SignupPage({ searchParams }) {
 
   return (
     <div className="auth-shell">
-      <Image src="/logo-icon.png" alt="Aerion Software" width={56} height={56} className="auth-logo" priority />
+      <Image src="/logo-icon.png" alt="Aerion Software" width={112} height={112} className="auth-logo" priority />
       <h1>Create your account</h1>
       <p className="text-muted" style={{ marginTop: 6, marginBottom: 24 }}>
         {mode === "join" ? "Join an existing workspace with an invite code." : "Start a new workspace."}

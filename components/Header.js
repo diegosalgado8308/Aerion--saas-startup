@@ -14,7 +14,7 @@ export default function Header({ session }) {
     <header className="app-header">
       <div className="container">
         <Link href={session ? "/dashboard" : "/"} className="brand">
-          <Image src="/logo-icon.png" alt="" width={30} height={30} className="brand-mark" priority />
+          <Image src="/logo-icon.png" alt="" width={44} height={44} className="brand-mark" priority />
           Aerion Software
         </Link>
 
