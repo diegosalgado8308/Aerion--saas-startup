@@ -6,8 +6,9 @@ Engineering reference for how Aerion Software is put together: the layers reques
 
 ### 1. Presentation (App Router UI)
 
-- Next.js 16 App Router under `app/`, mixing React Server Components (default) with the client components under `components/` (`Header`, `SignOutButton`, `EconomyDiagramView`, `SimulationChart`, `BalanceReport`).
+- Next.js 16 App Router under `app/`, mixing React Server Components (default) with the client components under `components/` (`Header`, `SignOutButton`, `EconomyDiagramView`, `SimulationChart`, `BalanceReport`, `DiagramExportButtons`, `Toast`, `FormattedDate`).
 - Pages are `async` Server Components that fetch their own data directly (`app/dashboard/page.js`, `app/projects/[id]/economy/[diagramId]/page.js`, etc.) — no client-side data-fetching layer sits in front of them.
+- One-time action feedback (`?error=`/`?sent=` query params set by a redirecting Server Action) renders via `<Toast>`, not a static page banner. Every page passes a server-generated `key={crypto.randomUUID()}` alongside the message — without it, two identical error strings in a row (e.g. retrying a failed login) wouldn't remount the component, so the already-dismissed/expired toast from the first occurrence would just stay hidden on the second.
 
 ### 2. Routing & request gating
 
@@ -116,7 +117,7 @@ Quick reference — details for each follow below.
 - The Neon adapter's WebSocket requirement means `ws` is a runtime dependency, not just a dev convenience — dropping it breaks the DB connection outside environments with native WebSocket support.
 - `proxy.js` is the *only* place session-based access is blocked; any new route is protected by default, but a new *public* route must be added to `PUBLIC_PATHS` explicitly. A route that needs to bypass session auth entirely (like the cron route, which has no session to check) instead needs adding to `config.matcher`'s exclusion — and must then enforce its *own* auth inside the handler, the way `api/cron/task-reminders` checks `CRON_SECRET`. Forgetting that second part is the actual footgun: excluding a route from the matcher without adding equivalent auth inside it leaves a genuinely open endpoint.
 
-## Cross-cutting: multi-tenancy & authorization
+## Cross-cutting: multi-tenancy, authorization & login security
 
 Every domain entity hangs off a `Workspace`, and every `lib/` module enforces that boundary the same way rather than relying on a global query filter:
 
@@ -124,6 +125,18 @@ Every domain entity hangs off a `Workspace`, and every `lib/` module enforces th
 - These guards walk the relation chain back to `Workspace` and throw `ValidationError` — surfaced to the user as "not found," not "forbidden" — if the record belongs to a different workspace. A missing row and someone else's row are deliberately indistinguishable to the caller.
 - There is no row-level security at the database layer — the guarantee lives entirely in this repeated `lib/` pattern. A new domain module that queries Prisma directly without going through the equivalent guard reintroduces a cross-tenant access bug.
 - `role` (`OWNER` / `MEMBER`) exists on `User`, flows into the session via the `jwt`/`session` callbacks, and gates the one owner-only action: `removeMember` (`lib/workspace.js`) rejects the call server-side unless the acting user's stored `role` is `OWNER` — `app/team/page.js` also checks `session.user.role === "OWNER"` client-side to decide whether to render the "remove" control at all, but the enforcement that actually matters is the one in `lib/workspace.js`. No other `lib/` function branches on role today; everywhere else, workspace membership alone is the access boundary.
+- `verifyCredentials` (`lib/workspace.js`) is the single entry point for password verification, called from the Credentials provider's `authorize`. It locks an account for 15 minutes after 5 consecutive failed attempts (`User.failedLoginAttempts`/`lockedUntil`) and returns `null` indistinguishably for a nonexistent account, a wrong password, or a currently-locked account — this is the same "don't reveal why" principle as the workspace guards above, applied to auth instead of tenancy. Known trade-off, documented in the function itself: attempt-based lockout without per-IP tracking is itself abusable (an attacker can lock out someone else's account on purpose); that's accepted here rather than adding IP-based limits, which would need request context this DB-only function doesn't have.
+
+## Accessibility & internationalization
+
+Scoped narrowly and honestly — this is not a full a11y audit or an i18n system, just the concrete gaps that were fixed:
+
+- **Skip link** — `app/layout.js` renders a visually-hidden-until-focused `<a href="#main-content">` before the header, landing on `<main id="main-content">`. Lets keyboard/screen-reader users bypass the header nav on every page.
+- **Focus visibility** — `.field input/select/textarea` previously did `outline: none` on `:focus` and relied on a border-color change alone as the only visible indicator. Now split: plain `:focus` still gets the border-color change (any click), but `:focus-visible` additionally gets a real 2px outline (keyboard navigation specifically). A second, general `a/button/input/select/textarea:focus-visible` rule in `globals.css` covers interactive elements that live outside a `.field` wrapper (e.g. `.status-select`), which the field-scoped rule doesn't reach.
+- **Toast `aria-live`** — see **Presentation**, above; errors announce as `role="alert"`/`aria-live="assertive"`, success as `aria-live="polite"`.
+- **Locale-aware dates, honestly scoped** — `<FormattedDate>` (`components/FormattedDate.js`) is a client component that formats with `Intl`'s default (no explicit locale), which resolves to the *visitor's* browser locale. This only works because it's a client component — the same call in a Server Component would resolve to the *server's* locale, not the visitor's, which is why this couldn't just be a one-line fix to the old server-rendered `formatDate`/`formatDateTime` helpers. It renders with `suppressHydrationWarning`, the standard React pattern for values that are expected to legitimately differ between the server-rendered HTML and the client's re-render.
+- **Cron reminder emails don't get the same treatment** — there's no per-user locale stored anywhere in this app (no `User.locale` field, no `Accept-Language` capture at signup), so an email has no real "visitor" to defer to the way a page render does. `app/api/cron/task-reminders/route.js` uses ISO 8601 (`YYYY-MM-DD`) instead — not personalized, but unambiguous to every reader, which a hardcoded `"en-US"` MM/DD format was not.
+- **What this is *not*** — no translated strings anywhere (all UI text is hardcoded English), no RTL support, no locale-based routing. A real i18n system would need a translation library, a strings catalog, and a way to know the user's *content* language preference (not just their number/date formatting locale, which `Intl` gives you for free) — none of that exists here.
 
 ## Testing strategy
 
