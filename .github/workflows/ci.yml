@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    # Tests hit a real Neon database (see lib/__tests__/helpers.js) — DATABASE_URL
+    # must point at a real Postgres instance, ideally a dedicated Neon branch for
+    # CI rather than the same one used for local dev. AUTH_SECRET/AUTH_TRUST_HOST
+    # are needed because NextAuth validates its config at import time, which
+    # `next build` triggers. Set these as repository secrets under
+    # Settings > Secrets and variables > Actions before this workflow can pass.
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
+      AUTH_TRUST_HOST: "true"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run lint
+
+      - run: npm test
+
+      - run: npm run build
