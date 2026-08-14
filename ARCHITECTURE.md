@@ -11,9 +11,9 @@ Engineering reference for how Aerion Software is put together: the layers reques
 
 ### 2. Routing & request gating
 
-- File-based routing via the App Router (`app/<route>/page.js`, dynamic segments like `[id]`, `[diagramId]`).
-- `proxy.js` is the auth gate for every request: it runs `auth()` from NextAuth and redirects to `/login` for any non-public path (`config.matcher` excludes `api/auth`, static assets, and the favicon).
-- `app/api/auth/[...nextauth]` exposes the NextAuth route handlers (`handlers.GET`/`POST`) for the credentials sign-in flow.
+- File-based routing via the App Router (`app/<route>/page.js`, dynamic segments like `[id]`, `[diagramId]`, `[taskId]`).
+- `proxy.js` is the auth gate for session-based routes: it runs `auth()` from NextAuth and redirects to `/login` for any path not in `PUBLIC_PATHS` (`/`, `/login`, `/signup`). Separately, `config.matcher` excludes a few paths from the proxy *entirely* — those routes have no user session to check in the first place and enforce their own auth instead: `api/auth` (NextAuth's own handlers) and `api/cron` (bearer-token-secured, see below).
+- Three API routes exist today: `app/api/auth/[...nextauth]` (NextAuth's credentials sign-in handlers), `app/api/economy/[diagramId]/export` (JSON diagram export, session-gated via `proxy.js` like any other page), and `app/api/cron/task-reminders` (the due-date reminder sweep, gated by `CRON_SECRET` instead of a session since it's triggered by Vercel Cron, not a browser).
 
 ### 3. Mutation boundary (Server Actions)
 
@@ -34,7 +34,7 @@ Engineering reference for how Aerion Software is put together: the layers reques
 ### 6. Persistence
 
 - PostgreSQL, hosted on Neon (serverless Postgres), schema-managed by Prisma (`prisma/schema.prisma`, `prisma/migrations/`).
-- Core entities: `Workspace` → `User`/`Project` → `Task` / `EconomyDiagram` → `EconomyNode`/`EconomyConnection`/`EconomyLayer`, all scoped by `workspaceId` at the top of the tree.
+- Core entities: `Workspace` → `User`/`Project` → `Task` (→ `Comment`/`Attachment`) / `EconomyDiagram` → `EconomyNode`/`EconomyConnection`/`EconomyLayer`, all scoped by `workspaceId` at the top of the tree.
 
 ## Essential Integrations & Add-ons
 
@@ -50,6 +50,9 @@ Quick reference — details for each follow below.
 | **Vitest** | Unit tests (`lib/__tests__/`); `postinstall` runs `prisma generate` so the generated client is always present before tests/build. |
 | **ESLint 9 + `eslint-config-next`** | Linting, flat config (`eslint.config.mjs`). |
 | **Prisma skills** (`.claude/skills/`, `.agents/skills/`) | Bundled reference docs for Prisma CLI, Client API, Postgres setup, and v7 migration — available to any agent working in this repo. |
+| **Resend** (`resend`) | Transactional email — workspace invites and due-date task reminders (`lib/email.js`). |
+| **Vercel Blob** (`@vercel/blob`) | File storage for task attachments (`lib/blob.js`). |
+| **Vercel Cron** (`vercel.json`) | Triggers the daily due-date reminder sweep — see `app/api/cron/task-reminders`. Only takes effect once deployed to Vercel; there's no local equivalent. |
 
 ### 1. Neon Postgres
 
@@ -64,7 +67,7 @@ Quick reference — details for each follow below.
 
 ### 3. Prisma ORM 7
 
-- Schema lives in `prisma/schema.prisma`; migrations are timestamped folders under `prisma/migrations/` (currently: init, add-indexes, add-economy-diagrams, add-economy-layers — each migration name describes the feature that motivated it).
+- Schema lives in `prisma/schema.prisma`; migrations are timestamped folders under `prisma/migrations/` (currently: init, add-indexes, add-economy-diagrams, add-economy-layers, add-task-comments, add-task-due-reminder-sent-at, add-task-attachments — each migration name describes the feature that motivated it).
 - The generated client is emitted to `app/generated/prisma` (set via `generator client { output = "../app/generated/prisma" }`), not `node_modules/@prisma/client`. `lib/prisma.js` imports from that path explicitly. `postinstall: "prisma generate"` in `package.json` guarantees this generated code exists after every `npm install`, even though it's not hand-written or (typically) hand-edited.
 
 ### 4. NextAuth v5 (beta)
@@ -89,11 +92,29 @@ Quick reference — details for each follow below.
 
 - `.claude/skills/` and `.agents/skills/` ship the same set of Prisma reference skills twice, once per agent-tooling convention (Claude Code vs. the more general `.agents/skills` layout some tools read). They cover CLI usage, the Client API, Postgres setup, Compute deployment, driver-adapter implementation, and the v6→v7 migration — background knowledge any agent should pull in before touching `prisma/` or `lib/prisma.js` rather than guessing at v7 syntax from older training data.
 
+### 9. Resend
+
+- `lib/email.js` wraps two email types: `sendInviteEmail` (workspace invites, triggered from `app/team/page.js`) and `sendTaskDueReminder` (triggered from the cron route). Both share one lazily-constructed `Resend` client and one `FROM` address (`RESEND_FROM_EMAIL`, defaulting to Resend's own sandbox address so sending works before a custom domain is verified).
+- Deliberately fails loud with a plain `Error` — not a `ValidationError` — when `RESEND_API_KEY` is missing, since a missing API key is a configuration problem, not user input. Callers (`handleInviteByEmail`, the cron route) catch it generically alongside `ValidationError` rather than letting it crash the request, since "email didn't send" shouldn't take down the page that triggered it.
+- Untested by the Vitest suite, same as Vercel Blob below — sending a real email is an external side effect outside what the DB-backed integration tests exercise. Confirmed working end-to-end manually instead: the invite flow and the cron route both correctly show a graceful failure message when `RESEND_API_KEY` isn't set, which is the only path that's actually exercisable without a real key.
+
+### 10. Vercel Blob
+
+- `lib/blob.js` wraps `put`/`del` from `@vercel/blob` for task attachments. Uploads go through a plain `<form action={serverAction}>` on the task detail page — the file arrives as a `File` inside `FormData`, no separate token-endpoint/client-upload flow needed, since attachments are expected to be small enough for a normal Server Action body.
+- That's *why* `next.config.mjs` raises `experimental.serverActions.bodySizeLimit` to `10mb` — Server Actions default to a much smaller limit, and it needs to stay in sync with `MAX_ATTACHMENT_BYTES` in `lib/blob.js` (both are commented pointing at each other).
+- Files are stored with `access: "public"` — anyone with the URL can fetch it, no auth check at the Blob layer. The access control is entirely at the *listing* level: only workspace members can see a task's attachment URLs in the first place, via the same `require*InWorkspace` pattern as everything else.
+- Deleting an attachment deletes the DB row first, then the Blob file as a best-effort follow-up (`.catch(() => {})` in the page's action) — so a Blob-side failure never leaves a dangling DB reference, at the cost of occasionally orphaning a file in storage.
+
+### 11. Vercel Cron
+
+- `vercel.json` schedules `GET /api/cron/task-reminders` once daily (`0 13 * * *`). This is inert locally and in any non-Vercel deployment — cron triggering is a Vercel platform feature, not something `next dev`/`next start` provide on their own. Trigger it manually (e.g. `curl` with the `Authorization: Bearer $CRON_SECRET` header) to test the sweep outside of Vercel.
+- The route has no session — Vercel's cron trigger doesn't carry a user cookie — so it sits outside `proxy.js`'s auth gate entirely (excluded via `config.matcher`) and checks `CRON_SECRET` itself instead. See the **Routing & request gating** constraint above.
+
 ### Notable constraints from this stack
 
 - Because the Prisma client is generated to a custom path (`app/generated/prisma`), any tooling that assumes the default `node_modules/@prisma/client` location needs the `output` override from `schema.prisma` in mind.
 - The Neon adapter's WebSocket requirement means `ws` is a runtime dependency, not just a dev convenience — dropping it breaks the DB connection outside environments with native WebSocket support.
-- `proxy.js` is the *only* place unauthenticated access is blocked; any new route added outside `PUBLIC_PATHS` is protected by default, but a new *public* route must be added to that set explicitly.
+- `proxy.js` is the *only* place session-based access is blocked; any new route is protected by default, but a new *public* route must be added to `PUBLIC_PATHS` explicitly. A route that needs to bypass session auth entirely (like the cron route, which has no session to check) instead needs adding to `config.matcher`'s exclusion — and must then enforce its *own* auth inside the handler, the way `api/cron/task-reminders` checks `CRON_SECRET`. Forgetting that second part is the actual footgun: excluding a route from the matcher without adding equivalent auth inside it leaves a genuinely open endpoint.
 
 ## Cross-cutting: multi-tenancy & authorization
 
@@ -109,17 +130,24 @@ Every domain entity hangs off a `Workspace`, and every `lib/` module enforces th
 - Vitest (`vitest.config.mjs`) runs in a plain Node environment with `testTimeout`/`hookTimeout` raised to 20s — generous because tests hit a **real Neon database**, not a mock or an in-memory substitute. `vitest.setup.js` just loads `.env` via `dotenv/config` so `DATABASE_URL` is available.
 - Tests are integration-style against `lib/`: `lib/__tests__/helpers.js` provides `makeTenant()` (spins up a real `Workspace` + `OWNER` `User` via `createWorkspaceAndOwner`) and `cleanupWorkspace()` (cascading delete), so each test suite creates and tears down its own isolated tenant rather than sharing fixtures or truncating tables.
 - `economy-simulation.js` is the one module tested as pure functions with in-memory fixtures (no DB, no tenant) — by design, per the comment at the top of that file — which is why it's the most exhaustively covered piece of logic in the repo (`lib/__tests__/economy-simulation.test.js`).
+- `lib/email.js` and `lib/blob.js` are the opposite case: real external I/O with no Vitest coverage at all. `addAttachment`/`deleteAttachment` in `tasks.js` *are* tested (they're plain DB operations that happen to take already-uploaded metadata), but the upload/send calls themselves aren't. This is a real gap, not an oversight to fix casually — testing it for real means either a Resend/Blob sandbox account or mocking the SDKs, neither of which exists in this repo yet.
 - There is no browser/E2E test suite in the repo; UI verification so far has been done ad hoc with Playwright driven manually against the dev server, not checked in as a repeatable test.
+- CI (`.github/workflows/ci.yml`) runs this same test suite against a real database on every push/PR, which means it needs `DATABASE_URL` and `AUTH_SECRET` as GitHub repository secrets before it'll pass — see **Deployment status** below.
 
 ## Configuration & environment
 
-Three environment variables, defined in `.env` (not committed) and loaded via `dotenv/config` for tests/tooling — `next dev`/`next build` load `.env` natively:
+Environment variables, defined in `.env` (not committed) and loaded via `dotenv/config` for tests/tooling — `next dev`/`next build` load `.env` natively:
 
 | Variable | Used by | Purpose |
 |---|---|---|
 | `DATABASE_URL` | `lib/prisma.js`, `prisma.config.ts` | Neon Postgres connection string for both the app's Prisma client and `prisma migrate`. |
 | `AUTH_SECRET` | NextAuth (`lib/auth.js` via `authConfig`) | Signs/encrypts the JWT session. |
 | `AUTH_TRUST_HOST` | NextAuth | Tells Auth.js to trust the deployment's host header — needed whenever the app isn't running on a NextAuth-recognized default host (e.g. behind a proxy or on a non-standard local port). |
+| `RESEND_API_KEY` | `lib/email.js` | Authenticates with Resend. Without it, invite/reminder emails fail gracefully (see **Resend**, above) rather than sending. |
+| `RESEND_FROM_EMAIL` | `lib/email.js` | Optional — the `From` address for outgoing email. Defaults to Resend's sandbox address if unset. |
+| `APP_URL` | `lib/workspace.js` (`buildInviteUrl`), `app/api/cron/task-reminders` | Base URL used to build absolute links in emails (invite links, task links) — these can't be relative since email clients have no notion of "the current site." Defaults to `http://localhost:3000`. |
+| `CRON_SECRET` | `app/api/cron/task-reminders` | Bearer token the cron route requires — see **Vercel Cron**, above. The route fails closed (rejects everything) if this isn't set at all. |
+| `BLOB_READ_WRITE_TOKEN` | `lib/blob.js` (read implicitly by `@vercel/blob`) | Authenticates with Vercel Blob. Without it, attachment uploads fail gracefully rather than succeeding silently with no storage. Provisioned automatically for deployments linked to a Vercel project with Blob enabled; needs setting manually for local dev. |
 
 ## Code editor & IDE extensions
 
@@ -158,10 +186,20 @@ No project file drives this — these are just the plugins worth having installe
 
 ### API management
 
-There is exactly one HTTP API route in this app: `app/api/auth/[...nextauth]/route.js`, NextAuth's own catch-all for the credentials sign-in flow. Every other mutation goes through Server Actions (see **Mutation boundary**, above) — those aren't independently callable HTTP endpoints, so there's nothing for a Postman/Insomnia-style tool to point at yet.
+Three HTTP API routes exist now (see **Routing & request gating**, above), but they're still narrow enough that a Postman/Insomnia collection or an API gateway would be overkill:
 
-Given that, a dedicated API-management add-on (a Postman collection, an Insomnia workspace, an API gateway) isn't warranted by what exists today. That becomes worth adding if the app grows a real public API surface — webhooks, a REST or GraphQL layer for external consumers — not before.
+- `api/auth/[...nextauth]` — NextAuth's own handlers; not meant to be called directly.
+- `api/economy/[diagramId]/export` — a single authenticated GET, already exercised by a plain `<a href download>` link in the UI. `curl -H "Cookie: ..."` is enough to poke at it manually.
+- `api/cron/task-reminders` — a single bearer-token GET, easiest to test with a raw `curl -H "Authorization: Bearer $CRON_SECRET"` (see **Vercel Cron**, above) rather than any GUI tool.
+
+Every actual *mutation* in the app still goes through Server Actions (see **Mutation boundary**), which aren't independently callable HTTP endpoints — a Postman collection can't reach them at all. Revisit this once there's a real public API surface (webhooks, a REST/GraphQL layer for external consumers) rather than a handful of narrow, already-manually-tested routes.
 
 ## Deployment status
 
-No deployment configuration exists in this repo yet — no CI workflow, no `Dockerfile`, no `vercel.json`. Today the app only runs via `npm run dev` (Turbopack dev server) or `npm run build && npm run start` locally. The database is already externally hosted (Neon), so shipping this currently means: point `DATABASE_URL`/`AUTH_SECRET`/`AUTH_TRUST_HOST` at a target environment and run the Next.js production build behind whatever Node host is chosen — that choice hasn't been made yet.
+Set up, but not yet deployed:
+
+- **CI** — `.github/workflows/ci.yml` runs lint, test, and build on push/PR to `main`/`master`. It's currently inert: this repo has no GitHub remote yet, and even once pushed, the workflow needs `DATABASE_URL` and `AUTH_SECRET` set as GitHub repository secrets before it'll pass (tests hit a real database — see **Testing strategy**). Ideally `DATABASE_URL` there points at a dedicated Neon branch for CI, not the same database used for local dev, so parallel/repeated CI runs don't collide with or pollute dev data.
+- **Vercel project** — linked (`vercel link`), creating `.vercel/project.json` for the `aerion-software` project under the account's default team. No deployment has been triggered — that's a separate, explicit step (`vercel` for a preview, `vercel --prod` for production) once env vars are configured on the Vercel project itself (`DATABASE_URL`, `AUTH_SECRET`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `APP_URL`, `CRON_SECRET`, `BLOB_READ_WRITE_TOKEN` — see **Configuration & environment**). `AUTH_TRUST_HOST` doesn't need setting on Vercel; Vercel deployments set the equivalent automatically.
+- **Vercel Cron** — `vercel.json` schedules the reminder sweep, but per **Vercel Cron** above, this only takes effect once actually deployed to Vercel; linking the project isn't enough on its own.
+- **Vercel Blob store** — not yet provisioned. `BLOB_READ_WRITE_TOKEN` needs a Blob store created against the linked Vercel project (Dashboard or `vercel blob store add`) before attachments will work in any deployed environment.
+- No `Dockerfile` or other non-Vercel deployment path exists — this is a Vercel-shaped deployment by design (Cron, and eventually Blob provisioning, are Vercel platform features the app already depends on), not a portable one.
