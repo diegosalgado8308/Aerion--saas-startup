@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { getProjectMeta } from "@/lib/projects";
 import { getDiagramsForProject, createDiagram } from "@/lib/economy";
 import { ValidationError } from "@/lib/workspace";
+import Toast from "@/components/Toast";
 
 export async function generateMetadata({ params }) {
   const { id } = await params;
@@ -50,7 +51,7 @@ export default async function EconomyListPage({ params, searchParams }) {
         </div>
       </div>
 
-      {errorMessage && <div className="notice notice-error">{errorMessage}</div>}
+      <Toast key={errorMessage ? crypto.randomUUID() : "no-error"} message={errorMessage} type="error" />
 
       <div className="card" style={{ marginBottom: 32, maxWidth: 480 }}>
         <h3 style={{ marginBottom: 16 }}>New diagram</h3>

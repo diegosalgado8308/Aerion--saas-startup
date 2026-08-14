@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AuthError } from "next-auth";
 import { signIn } from "@/lib/auth";
+import Toast from "@/components/Toast";
 
 export const metadata = { title: "Log in" };
 
@@ -30,7 +31,7 @@ export default async function LoginPage({ searchParams }) {
       <h1>Welcome back</h1>
       <p className="text-muted" style={{ marginTop: 6, marginBottom: 24 }}>Log in to your workspace.</p>
 
-      {hasError && <div className="notice notice-error">Invalid email or password.</div>}
+      <Toast key={hasError ? crypto.randomUUID() : "no-error"} message={hasError ? "Invalid email or password." : null} type="error" />
 
       <form action={handleLogin}>
         <div className="field">

@@ -22,6 +22,7 @@ import EconomyDiagramView, { ECONOMY_TYPE_COLOR } from "@/components/EconomyDiag
 import SimulationChart from "@/components/SimulationChart";
 import BalanceReport from "@/components/BalanceReport";
 import DiagramExportButtons from "@/components/DiagramExportButtons";
+import Toast from "@/components/Toast";
 
 export async function generateMetadata({ params }) {
   const { diagramId } = await params;
@@ -216,7 +217,7 @@ export default async function EconomyDiagramPage({ params, searchParams }) {
         </form>
       </div>
 
-      {errorMessage && <div className="notice notice-error">{errorMessage}</div>}
+      <Toast key={errorMessage ? crypto.randomUUID() : "no-error"} message={errorMessage} type="error" />
 
       <div className="section-head" style={{ marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h2 style={{ fontSize: "1.2rem" }}>Diagram</h2>
@@ -472,7 +473,7 @@ export default async function EconomyDiagramPage({ params, searchParams }) {
         <button type="submit" className="btn btn-primary">Run simulation</button>
       </form>
 
-      {simError && <div className="notice notice-error">{simError}</div>}
+      <Toast key={simError ? crypto.randomUUID() : "no-sim-error"} message={simError} type="error" />
 
       {simResult && (
         <div className="card">

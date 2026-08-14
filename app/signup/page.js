@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { AuthError } from "next-auth";
 import { signIn } from "@/lib/auth";
 import { createWorkspaceAndOwner, joinWorkspaceViaInvite, ValidationError } from "@/lib/workspace";
+import Toast from "@/components/Toast";
 
 export const metadata = { title: "Sign up" };
 
@@ -73,7 +74,7 @@ export default async function SignupPage({ searchParams }) {
         {mode === "join" ? "Join an existing workspace with an invite code." : "Start a new workspace."}
       </p>
 
-      {errorMessage && <div className="notice notice-error">{errorMessage}</div>}
+      <Toast key={errorMessage ? crypto.randomUUID() : "no-error"} message={errorMessage} type="error" />
 
       {mode === "create" ? (
         <form action={handleCreate}>

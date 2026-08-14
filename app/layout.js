@@ -17,8 +17,9 @@ export default async function RootLayout({ children }) {
   return (
     <html lang="en">
       <body>
+        <a href="#main-content" className="skip-link">Skip to content</a>
         <Header session={session} />
-        <main>{children}</main>
+        <main id="main-content">{children}</main>
         <SpeedInsights />
       </body>
     </html>

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { getProjects, createProject } from "@/lib/projects";
 import { ValidationError } from "@/lib/workspace";
+import Toast from "@/components/Toast";
 
 export const metadata = { title: "Projects" };
 
@@ -42,7 +43,7 @@ export default async function DashboardPage({ searchParams }) {
         </div>
       </div>
 
-      {errorMessage && <div className="notice notice-error">{errorMessage}</div>}
+      <Toast key={errorMessage ? crypto.randomUUID() : "no-error"} message={errorMessage} type="error" />
 
       <div className="card" style={{ marginBottom: 32, maxWidth: 480 }}>
         <h3 style={{ marginBottom: 16 }}>New project</h3>

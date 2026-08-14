@@ -5,6 +5,8 @@ import { auth } from "@/lib/auth";
 import { getTaskForWorkspace, updateTask, deleteTask, addComment, deleteComment, addAttachment, deleteAttachment } from "@/lib/tasks";
 import { uploadAttachment, deleteAttachmentBlob } from "@/lib/blob";
 import { ValidationError } from "@/lib/workspace";
+import Toast from "@/components/Toast";
+import FormattedDate from "@/components/FormattedDate";
 
 export async function generateMetadata({ params }) {
   const { taskId } = await params;
@@ -16,10 +18,6 @@ export async function generateMetadata({ params }) {
 const PRIORITY_LABEL = { LOW: "Low", MEDIUM: "Medium", HIGH: "High" };
 const PRIORITY_CLASS = { LOW: "pill-low", MEDIUM: "pill-medium", HIGH: "pill-high" };
 const STATUS_LABEL = { TODO: "To do", IN_PROGRESS: "In progress", DONE: "Done" };
-
-function formatDateTime(date) {
-  return new Date(date).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-}
 
 function formatFileSize(bytes) {
   if (bytes < 1024) return `${bytes} B`;
@@ -125,12 +123,12 @@ export default async function TaskDetailPage({ params, searchParams }) {
         </form>
       </div>
 
-      {errorMessage && <div className="notice notice-error">{errorMessage}</div>}
+      <Toast key={errorMessage ? crypto.randomUUID() : "no-error"} message={errorMessage} type="error" />
 
       <div className="card" style={{ marginBottom: 32 }}>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: task.description ? 16 : 0 }}>
           <span className={`pill ${PRIORITY_CLASS[task.priority]}`}>{PRIORITY_LABEL[task.priority]}</span>
-          {task.dueDate && <span className="task-due">{formatDateTime(task.dueDate)}</span>}
+          {task.dueDate && <span className="task-due"><FormattedDate date={task.dueDate} withTime /></span>}
           {task.assignee && (
             <span className="task-assignee">
               <span className="avatar-sm" style={{ width: 18, height: 18, fontSize: "0.6rem" }}>{task.assignee.name[0]}</span>
@@ -169,7 +167,7 @@ export default async function TaskDetailPage({ params, searchParams }) {
                   </a>
                   <div className="text-faint" style={{ fontSize: "0.75rem", marginTop: 2 }}>
                     {formatFileSize(attachment.size)} · {attachment.uploader?.name || "Removed member"} ·{" "}
-                    {formatDateTime(attachment.createdAt)}
+                    <FormattedDate date={attachment.createdAt} withTime />
                   </div>
                 </div>
                 {isOwn && (
@@ -210,7 +208,7 @@ export default async function TaskDetailPage({ params, searchParams }) {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <strong style={{ fontSize: "0.88rem" }}>{comment.author?.name || "Removed member"}</strong>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <span className="text-faint" style={{ fontSize: "0.75rem" }}>{formatDateTime(comment.createdAt)}</span>
+                    <span className="text-faint" style={{ fontSize: "0.75rem" }}><FormattedDate date={comment.createdAt} withTime /></span>
                     {isOwn && (
                       <form action={deleteForComment}>
                         <button type="submit" className="btn btn-danger btn-sm">Delete</button>

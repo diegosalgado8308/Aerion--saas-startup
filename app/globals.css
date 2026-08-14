@@ -307,8 +307,14 @@ h3 { font-size: 1.1rem; }
 .field input:focus,
 .field select:focus,
 .field textarea:focus {
-  outline: none;
   border-color: var(--accent);
+}
+
+.field input:focus-visible,
+.field select:focus-visible,
+.field textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 .field textarea {
@@ -609,4 +615,109 @@ tr:last-child td { border-bottom: none; }
   .grid-3, .grid-2 { grid-template-columns: 1fr; }
   .field-row { grid-template-columns: 1fr; }
   .header-nav { display: none; }
+}
+
+/* ==========================================================================
+   Focus visibility
+
+   Keyboard-only (:focus-visible, not :focus) so mouse clicks don't show a
+   ring, but every interactive element gets one when tabbed to — including
+   ones outside a .field wrapper (e.g. .status-select) that the form-field
+   focus rule above doesn't reach.
+   ========================================================================== */
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ==========================================================================
+   Skip link
+   ========================================================================== */
+
+.skip-link {
+  position: absolute;
+  top: -100px;
+  left: 16px;
+  z-index: 2000;
+  background: var(--accent);
+  color: #fff;
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: top 0.15s ease-out;
+}
+
+.skip-link:focus {
+  top: 16px;
+}
+
+/* ==========================================================================
+   Toast notifications
+   ========================================================================== */
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(420px, calc(100vw - 48px));
+  padding: 14px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 0.88rem;
+  font-weight: 600;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  animation: toast-in 0.2s ease-out;
+}
+
+.toast-error {
+  background: #1c1013;
+  color: #ff8a8f;
+  border: 1px solid rgba(229, 72, 77, 0.4);
+}
+
+.toast-success {
+  background: #0f1a15;
+  color: var(--success);
+  border: 1px solid rgba(63, 191, 130, 0.4);
+}
+
+.toast span {
+  flex: 1;
+  line-height: 1.4;
+}
+
+.toast-dismiss {
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 4px;
+  opacity: 0.7;
+}
+
+.toast-dismiss:hover {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation: none;
+  }
 }

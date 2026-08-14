@@ -6,6 +6,8 @@ import { getProjectForWorkspace, deleteProject } from "@/lib/projects";
 import { createTask, updateTaskStatus, deleteTask } from "@/lib/tasks";
 import { getWorkspaceMembers } from "@/lib/workspace";
 import { ValidationError } from "@/lib/workspace";
+import Toast from "@/components/Toast";
+import FormattedDate from "@/components/FormattedDate";
 
 export async function generateMetadata({ params }) {
   const { id } = await params;
@@ -28,9 +30,6 @@ function isOverdue(task) {
   return new Date(task.dueDate) < new Date(new Date().toDateString());
 }
 
-function formatDate(date) {
-  return new Date(date).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
 
 async function updateStatusForTask(taskId, projectId, formData) {
   "use server";
@@ -107,7 +106,7 @@ export default async function ProjectBoardPage({ params, searchParams }) {
         </div>
       </div>
 
-      {errorMessage && <div className="notice notice-error">{errorMessage}</div>}
+      <Toast key={errorMessage ? crypto.randomUUID() : "no-error"} message={errorMessage} type="error" />
 
       {project.tasksTruncated && (
         <div className="notice notice-error" style={{ background: "var(--surface-2)", color: "var(--text-muted)", borderColor: "var(--border)" }}>
@@ -172,7 +171,7 @@ export default async function ProjectBoardPage({ params, searchParams }) {
                     <div className="task-card-meta">
                       <span className={`pill ${PRIORITY_CLASS[task.priority]}`}>{PRIORITY_LABEL[task.priority]}</span>
                       {task.dueDate && (
-                        <span className={`task-due${overdue ? " overdue" : ""}`}>{formatDate(task.dueDate)}</span>
+                        <span className={`task-due${overdue ? " overdue" : ""}`}><FormattedDate date={task.dueDate} /></span>
                       )}
                     </div>
                     {task.assignee && (

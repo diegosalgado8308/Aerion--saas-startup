@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getWorkspaceMembers, removeMember, buildInviteUrl, ValidationError } from "@/lib/workspace";
 import { sendInviteEmail } from "@/lib/email";
+import Toast from "@/components/Toast";
 
 export const metadata = { title: "Team" };
 
@@ -78,8 +79,8 @@ export default async function TeamPage({ searchParams }) {
         </div>
       </div>
 
-      {errorMessage && <div className="notice notice-error">{errorMessage}</div>}
-      {sentEmail && <div className="notice notice-success">Invite sent to {sentEmail}.</div>}
+      <Toast key={errorMessage ? crypto.randomUUID() : "no-error"} message={errorMessage} type="error" />
+      <Toast key={sentEmail ? crypto.randomUUID() : "no-sent"} message={sentEmail ? `Invite sent to ${sentEmail}.` : null} type="success" />
 
       {isOwner && (
         <div className="card" style={{ marginBottom: 32 }}>

@@ -2,8 +2,16 @@ import { NextResponse } from "next/server";
 import { getTasksDueForReminder, markManyDueRemindersSent } from "@/lib/tasks";
 import { sendTaskDueReminder } from "@/lib/email";
 
+/**
+ * No per-recipient locale is stored anywhere in this app, so there's no
+ * real "their locale" to format for here (unlike on-page dates, which defer
+ * to the browser's actual locale via FormattedDate). ISO 8601 sidesteps the
+ * question rather than guessing: every locale reads YYYY-MM-DD unambiguously,
+ * whereas a hardcoded "en-US" MM/DD style is actively misleading to a
+ * recipient who reads dates DD/MM.
+ */
 function formatDueDate(date) {
-  return new Date(date).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return new Date(date).toISOString().slice(0, 10);
 }
 
 function taskUrl(task) {
