@@ -49,6 +49,9 @@ model User {
   role        Role      @default(MEMBER)
   createdAt   DateTime  @default(now())
 
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
+
   workspaceId String
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
