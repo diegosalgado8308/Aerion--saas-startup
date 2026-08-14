@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getTasksDueForReminder, markDueReminderSent } from "@/lib/tasks";
+import { getTasksDueForReminder, markManyDueRemindersSent } from "@/lib/tasks";
 import { sendTaskDueReminder } from "@/lib/email";
 
 function formatDueDate(date) {
@@ -24,7 +24,7 @@ export async function GET(request) {
   }
 
   const tasks = await getTasksDueForReminder();
-  let sent = 0;
+  const sentTaskIds = [];
   let failed = 0;
 
   for (const task of tasks) {
@@ -36,12 +36,14 @@ export async function GET(request) {
         dueDate: formatDueDate(task.dueDate),
         taskUrl: taskUrl(task),
       });
-      await markDueReminderSent(task.id);
-      sent += 1;
+      sentTaskIds.push(task.id);
     } catch {
       failed += 1;
     }
   }
 
-  return NextResponse.json({ checked: tasks.length, sent, failed });
+  // One UPDATE for every task reminded about this run, instead of one per task.
+  await markManyDueRemindersSent(sentTaskIds);
+
+  return NextResponse.json({ checked: tasks.length, sent: sentTaskIds.length, failed });
 }
