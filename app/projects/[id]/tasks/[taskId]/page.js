@@ -2,7 +2,8 @@ import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import Link from "next/link";
 import { auth } from "@/lib/auth";
-import { getTaskForWorkspace, updateTask, deleteTask, addComment, deleteComment } from "@/lib/tasks";
+import { getTaskForWorkspace, updateTask, deleteTask, addComment, deleteComment, addAttachment, deleteAttachment } from "@/lib/tasks";
+import { uploadAttachment, deleteAttachmentBlob } from "@/lib/blob";
 import { ValidationError } from "@/lib/workspace";
 
 export async function generateMetadata({ params }) {
@@ -18,6 +19,12 @@ const STATUS_LABEL = { TODO: "To do", IN_PROGRESS: "In progress", DONE: "Done" }
 
 function formatDateTime(date) {
   return new Date(date).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
+function formatFileSize(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 export default async function TaskDetailPage({ params, searchParams }) {
@@ -72,6 +79,40 @@ export default async function TaskDetailPage({ params, searchParams }) {
     }
   }
 
+  async function handleAddAttachment(formData) {
+    "use server";
+    const session = await auth();
+    // uploadAttachment can throw a ValidationError (bad file) or a plain Error
+    // (e.g. BLOB_READ_WRITE_TOKEN not configured) — both need a friendly
+    // message here rather than crashing the page.
+    let message = null;
+    try {
+      const uploaded = await uploadAttachment(formData.get("file"));
+      await addAttachment(taskId, session.user.workspaceId, session.user.id, uploaded);
+    } catch (err) {
+      message = err instanceof ValidationError ? err.message : "Couldn't upload the file. Try again.";
+    }
+    if (message) {
+      redirect(`/projects/${projectId}/tasks/${taskId}?error=${encodeURIComponent(message)}`);
+    }
+    revalidatePath(`/projects/${projectId}/tasks/${taskId}`);
+  }
+
+  async function handleDeleteAttachment(attachmentId) {
+    "use server";
+    const session = await auth();
+    try {
+      const attachment = await deleteAttachment(attachmentId, session.user.workspaceId, session.user.id);
+      // Best-effort: the DB row is already gone either way, so a failure here
+      // just means an orphaned file, not something worth surfacing to the user.
+      await deleteAttachmentBlob(attachment.url).catch(() => {});
+      revalidatePath(`/projects/${projectId}/tasks/${taskId}`);
+    } catch (err) {
+      if (err instanceof ValidationError) redirect(`/projects/${projectId}/tasks/${taskId}?error=${encodeURIComponent(err.message)}`);
+      throw err;
+    }
+  }
+
   return (
     <div className="container page">
       <div className="page-head">
@@ -106,6 +147,50 @@ export default async function TaskDetailPage({ params, searchParams }) {
             ))}
           </select>
           <button type="submit" className="btn btn-secondary btn-sm">Update status</button>
+        </form>
+      </div>
+
+      <div className="section-head" style={{ marginBottom: 16 }}>
+        <h2 style={{ fontSize: "1.2rem" }}>Attachments</h2>
+      </div>
+
+      {task.attachments.length === 0 ? (
+        <div className="empty-state" style={{ marginBottom: 16 }}>No attachments yet.</div>
+      ) : (
+        <div className="table-card" style={{ marginBottom: 16 }}>
+          {task.attachments.map((attachment) => {
+            const deleteForAttachment = handleDeleteAttachment.bind(null, attachment.id);
+            const isOwn = attachment.uploaderId === session.user.id;
+            return (
+              <div key={attachment.id} className="economy-list-item">
+                <div>
+                  <a href={attachment.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: "0.9rem" }}>
+                    {attachment.filename}
+                  </a>
+                  <div className="text-faint" style={{ fontSize: "0.75rem", marginTop: 2 }}>
+                    {formatFileSize(attachment.size)} · {attachment.uploader?.name || "Removed member"} ·{" "}
+                    {formatDateTime(attachment.createdAt)}
+                  </div>
+                </div>
+                {isOwn && (
+                  <form action={deleteForAttachment}>
+                    <button type="submit" className="btn btn-danger btn-sm">Delete</button>
+                  </form>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="card" style={{ marginBottom: 32 }}>
+        <h3 style={{ marginBottom: 16, fontSize: "0.95rem" }}>Add an attachment</h3>
+        <form action={handleAddAttachment}>
+          <div className="field">
+            <label htmlFor="file">File</label>
+            <input type="file" id="file" name="file" required />
+          </div>
+          <button type="submit" className="btn btn-primary">Upload</button>
         </form>
       </div>
 

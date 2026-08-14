@@ -54,6 +54,7 @@ model User {
 
   assignedTasks Task[]  @relation("TaskAssignee")
   comments      Comment[]
+  attachments   Attachment[]
 
   @@index([workspaceId])
 }
@@ -91,9 +92,27 @@ model Task {
   assignee    User?      @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
 
   comments    Comment[]
+  attachments Attachment[]
 
   @@index([projectId])
   @@index([assigneeId])
+}
+
+model Attachment {
+  id        String   @id @default(cuid())
+  filename  String
+  url       String
+  size      Int
+  createdAt DateTime @default(now())
+
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  uploaderId String?
+  uploader   User?   @relation(fields: [uploaderId], references: [id], onDelete: SetNull)
+
+  @@index([taskId])
+  @@index([uploaderId])
 }
 
 model Comment {
