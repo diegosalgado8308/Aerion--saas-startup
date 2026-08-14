@@ -53,6 +53,7 @@ model User {
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   assignedTasks Task[]  @relation("TaskAssignee")
+  comments      Comment[]
 
   @@index([workspaceId])
 }
@@ -88,8 +89,25 @@ model Task {
   assigneeId  String?
   assignee    User?      @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
 
+  comments    Comment[]
+
   @@index([projectId])
   @@index([assigneeId])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  body      String
+  createdAt DateTime @default(now())
+
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  authorId  String?
+  author    User?    @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([taskId])
+  @@index([authorId])
 }
 
 model EconomyDiagram {

@@ -168,7 +168,7 @@ export default async function ProjectBoardPage({ params, searchParams }) {
                 const overdue = isOverdue(task);
                 return (
                   <div key={task.id} className="task-card">
-                    <div className="task-card-title">{task.title}</div>
+                    <Link href={`/projects/${id}/tasks/${task.id}`} className="task-card-title" style={{ display: "block" }}>{task.title}</Link>
                     <div className="task-card-meta">
                       <span className={`pill ${PRIORITY_CLASS[task.priority]}`}>{PRIORITY_LABEL[task.priority]}</span>
                       {task.dueDate && (
