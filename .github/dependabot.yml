@@ -1,0 +1,30 @@
+version: 2
+updates:
+  # npm packages — the app's own "add-ons." Minor/patch bumps are grouped into
+  # one weekly PR to keep review load low; majors stay separate since they're
+  # the ones actually likely to break something (e.g. a future Prisma 8).
+  # Every PR here runs through the existing CI workflow (lint/test/build
+  # against a real Neon branch) before merge, not just a diff review.
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+    commit-message:
+      prefix: "deps"
+
+  # Keeps actions/checkout, actions/setup-node, etc. in ci.yml current too —
+  # those are dependencies of the pipeline itself, easy to forget.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    commit-message:
+      prefix: "ci"
