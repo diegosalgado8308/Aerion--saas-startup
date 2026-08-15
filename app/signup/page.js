@@ -128,6 +128,10 @@ export default async function SignupPage({ searchParams }) {
         )}
       </p>
       <p className="form-note">Already have an account? <Link href="/login">Log in</Link></p>
+      <p className="form-note text-faint">
+        By creating an account, you agree to our <Link href="/terms">Terms of Service</Link> and{" "}
+        <Link href="/privacy">Privacy Policy</Link>.
+      </p>
     </div>
   );
 }

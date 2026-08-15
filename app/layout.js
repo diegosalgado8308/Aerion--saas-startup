@@ -2,6 +2,7 @@ import { Inter, Montserrat, Fira_Code } from "next/font/google";
 import "./globals.css";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import Header from "@/components/Header";
+import Footer from "@/components/Footer";
 import { auth } from "@/lib/auth";
 
 // Three-font system: Inter for clean/minimalist body & UI text, Montserrat
@@ -29,6 +30,7 @@ export default async function RootLayout({ children }) {
         <a href="#main-content" className="skip-link">Skip to content</a>
         <Header session={session} />
         <main id="main-content">{children}</main>
+        <Footer />
         <SpeedInsights />
       </body>
     </html>

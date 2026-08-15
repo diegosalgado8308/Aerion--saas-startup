@@ -863,3 +863,67 @@ textarea:focus-visible {
     animation: none;
   }
 }
+
+/* ==========================================================================
+   Footer
+   ========================================================================== */
+
+.app-footer {
+  border-top: 1px solid var(--border);
+  padding: 24px 0;
+  margin-top: 40px;
+}
+
+.app-footer-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+}
+
+.app-footer-nav {
+  display: flex;
+  gap: 20px;
+}
+
+.app-footer-nav a {
+  color: var(--text-muted);
+}
+
+.app-footer-nav a:hover {
+  color: var(--text);
+}
+
+/* ==========================================================================
+   Legal / long-form content pages
+   ========================================================================== */
+
+.legal {
+  max-width: 720px;
+}
+
+.legal h2 {
+  margin-top: 32px;
+  margin-bottom: 12px;
+}
+
+.legal p {
+  margin-bottom: 14px;
+}
+
+.legal ul {
+  list-style: disc;
+  padding-left: 22px;
+  margin-bottom: 14px;
+}
+
+.legal li {
+  margin-bottom: 6px;
+}
+
+.legal a {
+  color: var(--accent);
+  text-decoration: underline;
+}
