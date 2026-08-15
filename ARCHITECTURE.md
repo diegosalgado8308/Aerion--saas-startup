@@ -224,6 +224,67 @@ Scoped narrowly and honestly — this is not a full a11y audit or an i18n system
 - **Cron reminder emails don't get the same treatment** — there's no per-user locale stored anywhere in this app (no `User.locale` field, no `Accept-Language` capture at signup), so an email has no real "visitor" to defer to the way a page render does. `app/api/cron/task-reminders/route.js` uses ISO 8601 (`YYYY-MM-DD`) instead — not personalized, but unambiguous to every reader, which a hardcoded `"en-US"` MM/DD format was not.
 - **What this is *not*** — no translated strings anywhere (all UI text is hardcoded English), no RTL support, no locale-based routing. A real i18n system would need a translation library, a strings catalog, and a way to know the user's *content* language preference (not just their number/date formatting locale, which `Intl` gives you for free) — none of that exists here.
 
+## UI layout architecture
+
+"Game UI & HUD layout architecture," "desktop/web layout frameworks," "resolution
+independence," and "industry-standard layout tools" are four game-dev framings of the same
+underlying question: does the interface keep working — every control reachable, nothing
+clipped — at every screen size? Audited by actually loading the authenticated app (dashboard,
+team, project board, task detail, economy diagrams) at 375px, 768px, 1440px, and 2560px in a
+real browser rather than assuming. Two real bugs turned up; one design already matched the
+industry-standard technique for its job.
+
+- **HUD-style persistent navigation, fixed** — below 900px, `.header-nav` ("Projects"/"Team")
+  was hidden by CSS with *no replacement*: primary navigation was completely unreachable on any
+  phone or tablet except via the dashboard link or the browser back button. A HUD element that
+  disappears below some resolution rather than relocating is exactly the failure mode this
+  category of bug is named after. Fixed with `components/MobileNavToggle.js` — a small client
+  component rendering a toggle button + dropdown panel (Projects, Team, the signed-in user's
+  name, sign out) that only renders below the same 900px breakpoint, with outside-click and
+  `Escape`-to-close handling. `.header-actions` (the desktop user-chip/sign-out row) hides at the
+  same breakpoint via a `.header-actions--authed` modifier class, so the two never show at once.
+  Verified interactively (toggle opens, links work), not just checked for DOM presence.
+  - **Real subtlety hit while building this**: `SignOutButton.js` is a Server Component with an
+    inline `"use server"` action. Importing it directly into `MobileNavToggle.js` (a Client
+    Component) broke the build — Next.js doesn't allow an inline server action inside a Client
+    Component's own module graph. Fixed via composition: `Header.js` (a Server Component) renders
+    `<SignOutButton />` and passes the *element* down as a `signOutSlot` prop, so
+    `MobileNavToggle.js` never imports `SignOutButton.js` at all, it just renders whatever JSX
+    it's handed. This is the officially-recommended pattern for mixing Server and Client
+    Components, not a workaround.
+  - **A second, easy-to-repeat mistake caught in the same fix**: the first version of the CSS put
+    the component's default `.mobile-nav { display: none; }` rule *after* the `@media (max-width:
+    900px) { .mobile-nav { display: block; } }` override in the file. Same specificity, later
+    source position wins regardless of the media query matching — so the toggle silently never
+    appeared at any width. Fixed by moving component base styles before the `Responsive` section,
+    matching this file's existing convention (breakpoint overrides go last, so they reliably win).
+- **Clipped content, fixed** — `.table-card` (wraps the Team page's members table) used
+  `overflow: hidden`, originally to clip the card's own rounded corners. Combined with a long
+  email address on a narrow screen, that also silently clipped the content itself — invisibly,
+  with no scrollbar, no ellipsis, no way to reach the missing characters. Changed to `overflow-x:
+  auto; overflow-y: hidden` — corners still clip correctly, but wide content becomes reachable by
+  scrolling instead of disappearing. Verified via `scrollWidth > clientWidth` after the fix.
+- **Resolution independence for the canvas-like surface, already correct** —
+  `components/EconomyDiagramView.js` renders the economy diagram as an SVG with `viewBox` set to
+  its content's own coordinate space, wrapped in `.diagram-scroll { overflow-x: auto }`. This is
+  the actual industry-standard technique for scalable canvas content (the same principle a game
+  UI's reference-resolution + scale-factor system solves) — the diagram's internal layout math
+  (`NODE_W`/`COL_GAP`/`ROW_GAP` in that file) never needs to know the viewport size at all. No
+  change needed here; called out because it's a correct instance of the exact thing the other two
+  bugs got wrong.
+- **Desktop/web layout framework — already CSS Grid + Flexbox, no new framework introduced** —
+  the app already uses a standard sticky-header app-shell (`.app-header { position: sticky; top:
+  0; z-index: 50 }` with `backdrop-filter: blur`), CSS Grid for the Kanban board and multi-column
+  forms, and Flexbox everywhere else, inside a `--max-width: 1120px` centered container. These
+  *are* the current industry-standard tools for this job — introducing a dedicated layout library
+  on top would be solving an already-solved problem.
+
+Not covered, and correctly so: no spacing-token scale was added. `globals.css` uses ad hoc
+pixel values for gaps/padding throughout; formalizing that into a `--space-1`…`--space-6` system
+would touch nearly every rule in a 700+ line stylesheet for zero visual change, since nothing
+currently needs the scale to be renamed, only used consistently. Worth doing if a real second
+consumer of the values shows up (a second theme, a component library extraction) — not before.
+
 ## Testing strategy
 
 - Vitest (`vitest.config.mjs`) runs in a plain Node environment with `testTimeout`/`hookTimeout` raised to 20s — generous because tests hit a **real Neon database**, not a mock or an in-memory substitute. `vitest.setup.js` just loads `.env` via `dotenv/config` so `DATABASE_URL` is available.

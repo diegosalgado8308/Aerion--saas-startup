@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import SignOutButton from "@/components/SignOutButton";
+import MobileNavToggle from "@/components/MobileNavToggle";
 
 export default function Header({ session }) {
   const initials = session?.user?.name
@@ -25,7 +26,7 @@ export default function Header({ session }) {
           </nav>
         )}
 
-        <div className="header-actions">
+        <div className={`header-actions${session ? " header-actions--authed" : ""}`}>
           {session ? (
             <>
               <div className="user-chip">
@@ -41,6 +42,8 @@ export default function Header({ session }) {
             </>
           )}
         </div>
+
+        {session && <MobileNavToggle userName={session.user.name} signOutSlot={<SignOutButton />} />}
       </div>
     </header>
   );

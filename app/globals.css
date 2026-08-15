@@ -474,7 +474,8 @@ h3 { font-size: 1.1rem; }
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 table { width: 100%; border-collapse: collapse; }
@@ -614,6 +615,104 @@ tr:last-child td { border-bottom: none; }
 }
 
 /* ==========================================================================
+   Mobile nav
+
+   .header-nav and .header-actions--authed both disappear below 900px (see
+   Responsive, further down) — this is the only remaining way to reach
+   Projects/Team/sign-out at that width, so it exists on every screen but
+   only *shows* below the breakpoint. Defined here, before Responsive, so
+   the media query's `display: block` override always wins the cascade
+   regardless of source order within the breakpoint block itself.
+   ========================================================================== */
+
+.mobile-nav {
+  display: none;
+  position: relative;
+}
+
+.mobile-nav-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.mobile-nav-icon,
+.mobile-nav-icon::before,
+.mobile-nav-icon::after {
+  content: "";
+  display: block;
+  width: 18px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--text);
+}
+
+.mobile-nav-icon {
+  position: relative;
+}
+
+.mobile-nav-icon::before {
+  position: absolute;
+  top: -6px;
+  left: 0;
+}
+
+.mobile-nav-icon::after {
+  position: absolute;
+  top: 6px;
+  left: 0;
+}
+
+.mobile-nav-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 8px;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.35);
+  z-index: 60;
+}
+
+.mobile-nav-panel a {
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.mobile-nav-panel a:hover {
+  background: var(--surface-2);
+}
+
+.mobile-nav-panel form {
+  padding: 2px 4px;
+}
+
+.mobile-nav-panel .btn {
+  width: 100%;
+}
+
+.mobile-nav-user {
+  padding: 10px 12px;
+  margin-top: 4px;
+  border-top: 1px solid var(--border);
+  color: var(--text-faint);
+  font-size: 0.8rem;
+}
+
+/* ==========================================================================
    Responsive
    ========================================================================== */
 
@@ -622,6 +721,8 @@ tr:last-child td { border-bottom: none; }
   .grid-3, .grid-2 { grid-template-columns: 1fr; }
   .field-row { grid-template-columns: 1fr; }
   .header-nav { display: none; }
+  .header-actions--authed { display: none; }
+  .mobile-nav { display: block; }
 }
 
 /* ==========================================================================
