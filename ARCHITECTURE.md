@@ -131,6 +131,78 @@ Every domain entity hangs off a `Workspace`, and every `lib/` module enforces th
 - `role` (`OWNER` / `MEMBER`) exists on `User`, flows into the session via the `jwt`/`session` callbacks, and gates the one owner-only action: `removeMember` (`lib/workspace.js`) rejects the call server-side unless the acting user's stored `role` is `OWNER` — `app/team/page.js` also checks `session.user.role === "OWNER"` client-side to decide whether to render the "remove" control at all, but the enforcement that actually matters is the one in `lib/workspace.js`. No other `lib/` function branches on role today; everywhere else, workspace membership alone is the access boundary.
 - `verifyCredentials` (`lib/workspace.js`) is the single entry point for password verification, called from the Credentials provider's `authorize`. It locks an account for 24 hours after 8 consecutive failed attempts (`User.failedLoginAttempts`/`lockedUntil`) and returns `null` indistinguishably for a nonexistent account, a wrong password, or a currently-locked account — this is the same "don't reveal why" principle as the workspace guards above, applied to auth instead of tenancy. Known trade-off, documented in the function itself: attempt-based lockout without per-IP tracking is itself abusable (an attacker can lock out someone else's account on purpose, and a 24-hour window makes that meaningfully more disruptive than a short one); that's accepted here rather than adding IP-based limits, which would need request context this DB-only function doesn't have.
 
+## Firewall & network defense
+
+"Add a firewall" for this app means four conceptually different layers. Two of them are real,
+concrete work items in a Vercel-serverless app; two of them don't exist here — there's no
+persistent kernel, NIC, or OS instance this project controls, so "add XDP/eBPF rules" or "add
+an OS firewall" has no target to attach to. Documented honestly below rather than faked.
+
+### 1. Embedded application-level firewall (in `next.config.mjs`)
+
+Response headers that constrain what a browser will do with this app's pages regardless of what
+any other layer does — the app's own first line of defense, shipped in code:
+
+- `Content-Security-Policy` — `default-src 'self'`, no external script/style/frame/image
+  sources (except `data:`/`blob:` where the app actually needs them, and the Vercel Blob
+  storage host for attachment images), `frame-ancestors 'none'`, `object-src 'none'`,
+  `base-uri 'none'`, `form-action 'self'`.
+- `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy:
+  strict-origin-when-cross-origin`, a locked-down `Permissions-Policy`, and HSTS
+  (`max-age=63072000; includeSubDomains; preload`).
+- **Known trade-off**: `script-src`/`style-src` keep `'unsafe-inline'` because Next.js injects
+  its own inline hydration payload on every page; removing it needs a per-request nonce
+  generated in `proxy.js` and threaded through every page, which is real complexity this app
+  doesn't currently justify — there's no `dangerouslySetInnerHTML` anywhere in the codebase, so
+  there's no stored-XSS surface a stricter `script-src` would actually be defending against.
+  Revisit if that changes. Verified locally against a production build (`next build && next
+  start`): all headers present, full signup→dashboard flow works, zero CSP-caused console
+  errors.
+- This layer also includes what was already documented above under **Cross-cutting**: the
+  `require*InWorkspace` tenant-isolation guards and `verifyCredentials`'s 8-attempt/24-hour
+  account lockout. Those are "embedded firewall" too — access-control logic living inside the
+  app rather than in front of it.
+
+### 2. Web Application Firewall (Vercel Firewall — Web & API layer)
+
+Two custom rules staged via `vercel firewall rules add` (Hobby plan supports custom rules and IP
+blocking; only "system bypass" needs Pro). **Staged, not yet published** — drafts don't affect
+live traffic until `vercel firewall publish --yes` is run:
+
+- **`Block exploit probes`** (`rule_block_exploit_probes_yzhJ6t`) — logs any request for
+  `/wp-admin`, `/wp-login.php`, `/.env`, `/.git/config`, `/phpmyadmin`, `/xmlrpc.php`,
+  `/.aws/credentials`, `/vendor/phpunit`, or a `../` traversal attempt. This app is neither
+  WordPress nor PHP, so real traffic never hits these — a request for any of them is a
+  vulnerability scanner, full stop.
+- **`Rate limit auth POSTs`** (`rule_rate_limit_auth_pos_ts_8CqmX7`) — logs (doesn't yet block)
+  when one IP sends more than 20 POSTs to `/login` or `/signup` in 60 seconds. This is the
+  direct answer to the gap flagged in **Cross-cutting** above: `verifyCredentials`'s lockout is
+  per-account with no IP context because it's a DB-only function; the WAF sits in front of the
+  request and *has* IP context, closing that gap without touching the app-level function at all.
+- Both rules are set to `log` action, per the firewall skill's staged-rollout guidance — logging
+  records matches without blocking anything, so publishing them now is safe. Review traffic at
+  `https://vercel.com/diegosalgado8308s-projects/aerion-software/firewall/traffic?filter=<rule-id>`
+  before tightening `Rate limit auth POSTs` from `log` to `rate_limit`/`deny`. Run `vercel
+  firewall publish --yes` to make the log rules active, then `vercel firewall diff` any time to
+  see what's still staged.
+
+### 3. Kernel & network-level packet filtering (XDP/eBPF) — not applicable here
+
+XDP/eBPF programs attach to a Linux kernel's network stack on a machine you administer. This app
+has no such machine — Vercel Functions are ephemeral and stateless, with no persistent kernel or
+NIC this project has access to attach anything to. The real equivalent at this layer is Vercel's
+own **automatic DDoS mitigation**: on by default for every project on every plan including
+Hobby, covers L3/L4/L7 attacks, not billed for blocked traffic, and requires zero configuration
+— there's nothing to "add" because it's already running.
+
+### 4. Software-managed OS firewall (Windows/Linux) — not applicable here
+
+Same root cause: production has no OS instance to configure `iptables`/`nftables`/Windows
+Defender Firewall rules on. The only real OS in this project's world is the developer's own
+Windows machine running `next dev`, which is already governed by Windows Defender Firewall by
+default and only ever binds the dev server to `localhost`/the local network — there's nothing
+exposed there to lock down further.
+
 ## Goal frameworks
 
 A project can optionally adopt one of 8 goal-planning frameworks (PACT, RTF, SOLVE, TAG, RACE, DREAM, CARE, RISE), each breaking a project's goal into a small ordered set of labeled stages (e.g. PACT → Problem, Approach, Compromise, Test) with an independently-editable text field per stage.
