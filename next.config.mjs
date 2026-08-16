@@ -1,3 +1,5 @@
+import { withSentryConfig } from "@sentry/nextjs";
+
 // Embedded application-level firewall: response headers that constrain what
 // a browser will do with this app's pages even if some other layer fails —
 // no external script/frame/image sources, no framing by other sites, no
@@ -49,4 +51,18 @@ const nextConfig = {
   },
 };
 
-export default nextConfig;
+// Uploads source maps so Sentry shows real stack traces instead of minified
+// Turbopack output — safe to add now that SENTRY_ORG/SENTRY_PROJECT/
+// SENTRY_AUTH_TOKEN are real values from the Vercel Sentry marketplace
+// integration (not guessed), which is also why this was deliberately left
+// out when Sentry was first wired up: an invalid/missing token here can
+// hard-fail the whole build depending on plugin version, and there was
+// nothing but placeholders to give it at the time. Turbopack support
+// specifically needs @sentry/nextjs >= 9.9.0 (this app is on 10.x) and
+// Next.js >= 15.3.0-canary.8 (this app is on 16.3.0 stable) — both clear.
+export default withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  silent: true,
+});
