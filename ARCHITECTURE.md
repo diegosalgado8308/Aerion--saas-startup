@@ -285,6 +285,47 @@ would touch nearly every rule in a 700+ line stylesheet for zero visual change, 
 currently needs the scale to be renamed, only used consistently. Worth doing if a real second
 consumer of the values shows up (a second theme, a component library extraction) — not before.
 
+## Memory: the heap and practical budgets
+
+"The Heap (Dynamic & Large)" and "Practical Memory Budgets" are game-engine terms for the same
+two ideas that apply directly here, not just by analogy:
+
+- **The heap** — in a game engine, the heap is where big, dynamically-sized, long-lived data
+  lives (loaded assets, dynamic arrays), as opposed to the stack (small, fixed-size, function-
+  local). This app's real equivalent is exactly that split: Neon Postgres holds all structured,
+  dynamically-growing data (users, projects, tasks, diagrams), Vercel Blob holds large binary
+  data (attachments) that has no business living in a database row or a function's own memory,
+  and neither ever gets fully loaded into a single function invocation's process memory at once
+  — Prisma queries return only what a given page/action actually needs, and file uploads stream
+  through `@vercel/blob` rather than buffering. The literal, physical version of "the heap" is
+  each Vercel Function's own process memory: Standard instances (the default, including Hobby)
+  get **2 GB / 1 vCPU** per invocation, with a **100 MB** platform-wide request body ceiling.
+  Nothing here needed changing — verified this is the real ceiling in effect (see `vercel:
+  vercel-functions` skill), not assumed from memory, since asserting a stale number would be
+  worse than not checking.
+- **Practical memory budgets — two real, previously-open gaps, now closed**. A "budget" in game
+  dev is a concrete numeric ceiling a subsystem is designed against, not just "as much as it
+  needs." This app already had two correct instances of that idea
+  (`MAX_ATTACHMENT_BYTES`/`bodySizeLimit` = 10 MB per file in `lib/blob.js` +
+  `next.config.mjs`; `MAX_NUMERIC_VALUE` = 1 billion per economy field in `lib/economy.js`; the
+  simulation's `steps` already clamped to 500 in `simulateDiagram`) — but two matching *count*
+  budgets were missing entirely:
+  - **`MAX_NODES_PER_DIAGRAM` = 200, `MAX_CONNECTIONS_PER_DIAGRAM` = 500** (`lib/economy.js`) —
+    `addNode`/`addConnection` had no ceiling on how many a single diagram could accumulate.
+    `runSimulation` allocates one time-series array per node, `steps` entries long; with `steps`
+    already capped but node count wide open, someone could still drive simulation memory,
+    `EconomyDiagramView.js`'s SVG render cost, and the export endpoint's JSON payload arbitrarily
+    high. 200 nodes × 500 steps keeps a worst-case run in the low tens of thousands of array
+    slots — nowhere close to the real 2 GB ceiling above, and well past anything a human places
+    by hand through the UI anyway.
+  - **`MAX_ATTACHMENTS_PER_TASK` = 20** (`lib/tasks.js`) — each file was already capped at 10 MB,
+    but nothing capped how many a single task could accumulate: unbounded real Vercel Blob
+    storage cost (a genuine dollar-cost budget, not just a memory one) and an ever-growing list
+    to render on the task detail page. 20 × 10 MB = a 200 MB/task ceiling.
+  - Both follow the existing `ValidationError` pattern (same as every other guard in `lib/`) and
+    use a plain `prisma.*.count()` check — cheap, indexed, no extra data fetched just to answer
+    "how many."
+
 ## Testing strategy
 
 - Vitest (`vitest.config.mjs`) runs in a plain Node environment with `testTimeout`/`hookTimeout` raised to 20s — generous because tests hit a **real Neon database**, not a mock or an in-memory substitute. `vitest.setup.js` just loads `.env` via `dotenv/config` so `DATABASE_URL` is available.
