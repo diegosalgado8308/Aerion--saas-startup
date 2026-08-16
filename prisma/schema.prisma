@@ -31,11 +31,27 @@ enum EconomyNodeType {
   CONVERTER
 }
 
+enum PlanTier {
+  FREE
+  PRO
+  BUSINESS
+}
+
 model Workspace {
   id         String    @id @default(cuid())
   name       String
   inviteCode String    @unique @default(cuid())
   createdAt  DateTime  @default(now())
+
+  plan                 PlanTier  @default(FREE)
+  stripeCustomerId     String?   @unique
+  stripeSubscriptionId String?   @unique
+  // Raw Stripe status string (active/trialing/past_due/canceled/...), not an
+  // enum we own — Stripe adds new statuses over time, and isSubscriptionActive()
+  // is deny-by-default (status === "active" || status === "trialing"), so it
+  // never needs a migration when Stripe extends their list.
+  subscriptionStatus   String?
+  currentPeriodEnd     DateTime?
 
   members    User[]
   projects   Project[]

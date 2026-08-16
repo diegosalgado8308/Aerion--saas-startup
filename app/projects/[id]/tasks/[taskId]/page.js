@@ -4,6 +4,7 @@ import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { getTaskForWorkspace, updateTask, deleteTask, addComment, deleteComment, addAttachment, deleteAttachment } from "@/lib/tasks";
 import { uploadAttachment, deleteAttachmentBlob } from "@/lib/blob";
+import { assertStorageQuota } from "@/lib/billing";
 import { ValidationError } from "@/lib/workspace";
 import Toast from "@/components/Toast";
 import FormattedDate from "@/components/FormattedDate";
@@ -85,7 +86,11 @@ export default async function TaskDetailPage({ params, searchParams }) {
     // message here rather than crashing the page.
     let message = null;
     try {
-      const uploaded = await uploadAttachment(formData.get("file"));
+      const file = formData.get("file");
+      if (file && typeof file !== "string") {
+        await assertStorageQuota(session.user.workspaceId, file.size);
+      }
+      const uploaded = await uploadAttachment(file);
       await addAttachment(taskId, session.user.workspaceId, session.user.id, uploaded);
     } catch (err) {
       message = err instanceof ValidationError ? err.message : "Couldn't upload the file. Try again.";

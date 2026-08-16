@@ -1,6 +1,6 @@
 export const metadata = { title: "Terms of Service" };
 
-const LAST_UPDATED = "August 15, 2026";
+const LAST_UPDATED = "August 16, 2026";
 
 export default function TermsPage() {
   return (
@@ -61,10 +61,12 @@ export default function TermsPage() {
         it through Aerion.</p>
 
       <h2>5. Fees</h2>
-      <p>Aerion is currently offered free of charge, with no paid plans. If we introduce paid plans or
-        usage limits in the future, we&apos;ll provide reasonable advance notice before any change affects
-        an existing workspace, and continued use after that notice constitutes acceptance of the new
-        terms.</p>
+      <p>Aerion offers a free plan and paid plans (Pro, Business), billed monthly per workspace. Paid
+        plans are processed by Stripe on Stripe&apos;s own hosted pages — we never handle your card details
+        directly. Subscriptions renew automatically each month until canceled; you can cancel or change
+        plans at any time from the billing portal, effective as described there. Fees are non-refundable
+        except where required by law. If we change pricing or plan limits, we&apos;ll provide reasonable
+        advance notice before it affects an existing subscription.</p>
 
       <h2>6. Termination</h2>
       <p>You may stop using Aerion at any time. We may suspend or terminate access to the service for

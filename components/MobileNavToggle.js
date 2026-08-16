@@ -6,7 +6,7 @@ import Link from "next/link";
 /**
  * Below 900px, .header-nav and the desktop .header-actions are both hidden
  * by CSS (see globals.css) — this panel is the only way to reach
- * Projects/Team/sign-out at that width, not just a decorative extra.
+ * Projects/Team/Billing/sign-out at that width, not just a decorative extra.
  *
  * signOutSlot is SignOutButton rendered by the caller (Header.js, a Server
  * Component) and passed down as an element, not imported here — SignOutButton
@@ -53,6 +53,7 @@ export default function MobileNavToggle({ userName, signOutSlot }) {
         <div id="mobile-nav-panel" className="mobile-nav-panel" role="menu">
           <Link href="/dashboard" role="menuitem" onClick={() => setOpen(false)}>Projects</Link>
           <Link href="/team" role="menuitem" onClick={() => setOpen(false)}>Team</Link>
+          <Link href="/billing" role="menuitem" onClick={() => setOpen(false)}>Billing</Link>
           <div className="mobile-nav-user">{userName}</div>
           {signOutSlot}
         </div>

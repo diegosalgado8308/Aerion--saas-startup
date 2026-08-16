@@ -23,6 +23,7 @@ export default function Header({ session }) {
           <nav className="header-nav">
             <Link href="/dashboard">Projects</Link>
             <Link href="/team">Team</Link>
+            <Link href="/billing">Billing</Link>
           </nav>
         )}
 

@@ -1,6 +1,6 @@
 export const metadata = { title: "Privacy Policy" };
 
-const LAST_UPDATED = "August 15, 2026";
+const LAST_UPDATED = "August 16, 2026";
 
 export default function PrivacyPolicyPage() {
   return (
@@ -27,9 +27,15 @@ export default function PrivacyPolicyPage() {
         any economy-simulation diagrams (nodes, connections, layers) you build.</p>
       <p><strong>File attachments.</strong> Files you attach to tasks are uploaded to our storage provider
         (Vercel Blob) and referenced by URL from your task data.</p>
+      <p><strong>Billing information.</strong> If a workspace subscribes to a paid plan, payment is handled
+        entirely by Stripe on their own hosted Checkout and Customer Portal pages — we never see or store
+        your card details. We do store the resulting Stripe customer/subscription identifiers and your
+        plan/billing status.</p>
       <p><strong>Automatically collected information.</strong> We use Vercel Speed Insights to measure page
-        performance (load times, Core Web Vitals). This is aggregated performance telemetry, not
-        cross-site tracking, and isn&apos;t used for advertising.</p>
+        performance (load times, Core Web Vitals), and Sentry to capture errors when something breaks
+        (the error itself, the page/request it happened on, and — since you&apos;re signed in — which
+        account and workspace was affected, so we can actually fix it). Neither is used for advertising or
+        cross-site tracking.</p>
       <p><strong>Cookies.</strong> We set one essential session cookie (via NextAuth) used to keep you
         signed in. We don&apos;t use marketing, advertising, or third-party tracking cookies.</p>
 
@@ -52,6 +58,10 @@ export default function PrivacyPolicyPage() {
         <li><strong>Vercel</strong> — hosts the application, serves file attachments via Vercel Blob, and
           provides aggregate performance telemetry via Speed Insights.</li>
         <li><strong>Resend</strong> — delivers transactional email (invites, due-date reminders).</li>
+        <li><strong>Stripe</strong> — processes payments for paid plans on its own hosted pages; we never
+          handle your card details directly.</li>
+        <li><strong>Sentry</strong> — captures application errors so we can fix them, including which
+          account/workspace was affected.</li>
       </ul>
       <p>We do not share your data with advertisers, data brokers, or analytics networks, and we do not
         sell personal information. We may disclose information if required by law or to protect the

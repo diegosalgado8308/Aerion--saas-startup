@@ -7,7 +7,7 @@ billing, data handling, or ops.
 
 **Status key**: ✅ Done &nbsp;|&nbsp; 🟡 Partial &nbsp;|&nbsp; ❌ Missing
 
-Last audited: 2026-08-15.
+Last audited: 2026-08-16.
 
 ## 1. Core Product & Multi-Tenancy
 
@@ -26,7 +26,7 @@ Last audited: 2026-08-15.
 | Login rate limiting / lockout | ✅ | 8 failed attempts locks the account 24h (`lib/workspace.js`). |
 | Session handling / sign-out | ✅ | JWT sessions via NextAuth; `SignOutButton` works. |
 | Email verification | ❌ | Any email is accepted at signup with no confirmation loop — no proof the account owner controls that inbox. |
-| Password reset / forgot password | ❌ | No flow exists. A locked-out or forgetful user has no self-serve recovery path today. |
+| Password reset / forgot password | ✅ | `/forgot-password` + `/reset-password` (`lib/passwordReset.js`) — hashed single-use token, 1h expiry, same "don't reveal why" enumeration protection as login. Also clears an active login lockout on success — the self-serve recovery path Section 2's gap called out. |
 | 2FA / MFA | ❌ | Not implemented. |
 
 ## 3. Data Protection, Privacy & Legal
@@ -37,32 +37,32 @@ Last audited: 2026-08-15.
 | Backups / disaster recovery | 🟡 | Neon provides point-in-time restore by platform default, but no restore drill has been run or documented — unverified in practice. |
 | Data export / portability | ❌ | No self-serve "export my data" for a workspace. |
 | Account / workspace deletion | ❌ | No delete-account or delete-workspace flow — data is retained indefinitely with no user-triggered erasure path. |
-| Privacy Policy / Terms of Service | ❌ | No legal pages exist anywhere in the app. |
+| Privacy Policy / Terms of Service | ✅ | `/privacy` + `/terms`, linked from the footer and the signup disclaimer. Content reflects actual data practices/subprocessors (Neon, Vercel Blob, Resend, now Stripe) rather than boilerplate. Governing-law jurisdiction still needs a real value filled in, and neither page has had real legal review. |
 | Cookie consent / GDPR-CCPA posture | ❌ | Not addressed — a blocker for EU/CA users specifically. |
 
 ## 4. Billing & Monetization
 
 | Item | Status | Evidence / Gap |
 |---|---|---|
-| Pricing page | ❌ | Doesn't exist. |
-| Payment processor integration | ❌ | No Stripe (or equivalent) anywhere in `package.json` or the codebase. |
-| Plan / subscription management | ❌ | Not implemented. |
-| Usage limits / metering | ❌ | Not implemented — nothing gates a free vs. paid tier. |
+| Pricing page | ✅ | `/pricing` — 3 tiers (Free/Pro/Business), flat per-workspace, monthly. |
+| Payment processor integration | ✅ | Stripe, provisioned via the Vercel Marketplace integration (`lib/stripe.js`). Hosted Checkout + Customer Portal — no Stripe.js/Elements on-page, zero CSP changes needed. |
+| Plan / subscription management | ✅ | `/billing` — upgrade via Checkout, manage/cancel via the Stripe Customer Portal, synced back via `app/api/webhooks/stripe`. Owner-only, re-checked server-side in `lib/billing.js`, not just hidden in the UI. |
+| Usage limits / metering | ✅ | `lib/billing.js`'s `assertCanAddMember`/`assertCanCreateProject`/`assertStorageQuota`/`assertEconomyToolEntitlement` gate member count, project count, attachment storage, and the economy tool per plan. Never retroactive — a workspace that falls below a new lower limit keeps existing data, only new creation is blocked. |
 
-The app currently has **zero monetization** — every feature is free and unmetered. This is the single largest gap between "working SaaS" and "commercial SaaS."
+Monetization is live: Free ($0: 3 members/3 projects/100MB, no economy tool), Pro ($19/mo: 10 members/20 projects/5GB, economy tool included), Business ($49/mo: unlimited members/projects, 50GB, economy tool included). **Still open**: the Stripe webhook secret needs registering against the deployed `/api/webhooks/stripe` URL before subscriptions actually sync (chicken-and-egg — the route had to exist first), and the Stripe Dashboard's Customer Portal needs "update subscription" manually enabled with both Prices allow-listed, or Pro↔Business switching won't work even though cancellation will.
 
 ## 5. Reliability & Observability
 
 | Item | Status | Evidence / Gap |
 |---|---|---|
 | Web Vitals monitoring | ✅ | `@vercel/speed-insights` wired into `app/layout.js`. |
-| Error tracking (Sentry/equivalent) | ❌ | No error-tracking SDK. Runtime errors are only visible via manual `vercel logs` or ad hoc Playwright runs, not surfaced proactively. |
+| Error tracking (Sentry/equivalent) | ✅ | Sentry, provisioned via the Vercel Marketplace integration — real org/project, source maps uploading, navigation tracing on. `app/global-error.js` catches root-layout failures specifically. Sentry's own issue alerts double as the "tell someone" channel. |
 | Structured logging | ❌ | No logging library — relies on default `console`/platform logs. |
-| Health-check endpoint | ❌ | No `/api/health` or equivalent for uptime monitors to poll. |
-| Uptime monitoring / status page | ❌ | Nothing external is watching whether the site is up. |
-| Alerting | ❌ | No alert channel (Slack/email/PagerDuty) configured for errors or downtime. |
+| Health-check endpoint | ✅ | `/api/health` — pings the DB with `SELECT 1`, public/unauthenticated but doesn't leak error detail (logs server-side instead). |
+| Uptime monitoring / status page | ❌ | Nothing external is polling `/api/health` yet — the endpoint exists, nothing is watching it. |
+| Alerting | 🟡 | Sentry alerts on new/regressed errors by default. No separate uptime/downtime alert channel (Slack/PagerDuty) exists yet. |
 
-If production breaks tonight, nobody — including you — gets told. This is the second-largest gap.
+Down from "nobody gets told" to "errors are caught and alerted on; a real outage-monitor polling /api/health is the remaining piece."
 
 ## 6. Deployment, CI/CD & Environments
 
@@ -78,7 +78,7 @@ If production breaks tonight, nobody — including you — gets told. This is th
 
 | Item | Status | Evidence / Gap |
 |---|---|---|
-| Unit/integration test suite | ✅ | 5 Vitest suites (`workspace`, `tasks`, `projects`, `economy`, `economy-simulation`) run against a real Neon DB. |
+| Unit/integration test suite | ✅ | 7 Vitest suites (`workspace`, `tasks`, `projects`, `economy`, `economy-simulation`, `passwordReset`, `billing`) run against a real Neon DB — 175 tests. |
 | Checked-in E2E test suite | ❌ | Verification this session used one-off Playwright scripts in the scratchpad, never committed to the repo — no regression safety net for user-facing flows. |
 | Email / Blob integration coverage | ❌ | `lib/email.js` and `lib/blob.js` have zero test coverage by design (documented external-I/O boundary), which is a reasonable trade-off but still a real gap. |
 | Load / performance testing | ❌ | Never done — no data on how the app behaves under concurrent load. |
@@ -114,19 +114,32 @@ If production breaks tonight, nobody — including you — gets told. This is th
 
 ## Bottom line
 
-Aerion Software is a **solid, well-engineered internal-tool-grade MVP**: real multi-tenancy,
-tested business logic, a live and monitored-for-performance deployment, environment hygiene
-most side projects never bother with, and a finished visual identity. It is **not yet
-commercially sellable**, for three concrete reasons, in priority order:
+Aerion Software has moved from **internal-tool-grade MVP** to **commercially sellable**: real
+multi-tenancy, tested business logic (175 tests against a real DB), error tracking + a
+health-check endpoint, self-serve password recovery, a real legal baseline, and live Stripe
+billing across 3 tiers. All four items from the previous "recommended order of attack" — legal
+pages → error tracking/health-check → password reset → billing — are done, in that order, this
+session.
 
-1. **No monetization** (Section 4) — there is currently no way to charge anyone anything.
-2. **No observability or alerting** (Section 5) — a production outage would go silent.
-3. **No account-recovery or legal baseline** (Sections 2–3) — no password reset, no email
-   verification, no Privacy Policy/Terms of Service. Any of these will surface as a support
-   fire or a compliance blocker the first week real customers show up.
+What's left is narrower and mostly operational rather than architectural:
 
-Recommended order of attack when ready to pursue this: **(1) Privacy Policy + Terms of
-Service** (cheap, unblocks everything else legally) → **(2) error tracking + a health-check
-endpoint** (cheap, closes the "silent outage" risk) → **(3) password reset flow** → **(4)
-billing integration**, roughly in that order, since each later item is more work than the one
-before it.
+1. **Billing isn't fully wired end-to-end yet** (Section 4) — the Stripe webhook secret needs
+   registering against the deployed `/api/webhooks/stripe` URL (chicken-and-egg: the route had
+   to exist and deploy first), and the Stripe Dashboard's Customer Portal needs "update
+   subscription" manually enabled with both Prices allow-listed, or plan switching silently
+   won't work even though the code is correct. Neither is a code change.
+2. **No account-recovery/legal completeness beyond the baseline** (Sections 2–3) — no email
+   verification, no 2FA, no self-serve data export or account/workspace deletion, no formal
+   GDPR/CCPA cookie-consent posture. The Privacy Policy is honest about these gaps rather than
+   promising them.
+3. **Observability has no external uptime watcher yet** (Section 5) — Sentry catches errors,
+   but nothing is polling `/api/health` from outside the app to detect a full outage.
+4. **No E2E test suite or load testing** (Section 7) — the Vitest suite is real integration
+   coverage against a live DB, but there's no browser-level regression net and no data on
+   concurrent-load behavior.
+
+None of these block charging real customers the way the original three did. Recommended next,
+roughly in order of cost-to-fix: finish the two billing operational steps above (near-zero code,
+just configuration) → account/workspace deletion + data export (the two data-protection items
+most likely to matter to an actual paying customer) → an external uptime monitor pointed at
+`/api/health`.
