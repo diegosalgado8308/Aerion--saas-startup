@@ -14,7 +14,13 @@ const CSP = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https://*.public.blob.vercel-storage.com",
   "font-src 'self' data:",
-  "connect-src 'self'",
+  // The three ingest.*.sentry.io patterns are deliberate, not redundant: Sentry's
+  // ingest host is region-specific (o<org>.ingest.us.sentry.io / .de.sentry.io /
+  // legacy .ingest.sentry.io) and CSP wildcards only match one label, so a plain
+  // "*.sentry.io" silently fails to match the four-level "o123.ingest.us.sentry.io"
+  // and the SDK drops every event with no visible error. Harmless if Sentry is
+  // never configured — an unset DSN means the SDK never calls out to any of these.
+  "connect-src 'self' https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://*.ingest.de.sentry.io",
   "frame-ancestors 'none'",
   "object-src 'none'",
   "base-uri 'none'",

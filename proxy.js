@@ -20,5 +20,5 @@ export const config = {
   // referenced by a *public* page (login/signup/landing) gets 302-redirected
   // to /login for logged-out visitors instead of served, which silently
   // breaks image rendering there rather than erroring loudly.
-  matcher: ["/((?!api/auth|api/cron|_next/static|_next/image|.*\\.\\w+$).*)"],
+  matcher: ["/((?!api/auth|api/cron|api/health|_next/static|_next/image|.*\\.\\w+$).*)"],
 };
