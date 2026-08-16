@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { PLAN_LIMITS, getPlanLimits, getWorkspaceUsage, createCheckoutSession, createPortalSession } from "@/lib/billing";
+import { PLAN_LIMITS, getPlanLimits, getWorkspaceUsage, isSubscriptionActive, createCheckoutSession, createPortalSession, changePlan } from "@/lib/billing";
 import { ValidationError } from "@/lib/workspace";
 import Toast from "@/components/Toast";
 import LivePoll from "@/components/LivePoll";
@@ -22,20 +22,31 @@ export default async function BillingPage({ searchParams }) {
   const sp = await searchParams;
   const errorMessage = sp?.error ? decodeURIComponent(sp.error) : null;
   const checkoutStatus = sp?.checkout;
+  const justUpdated = sp?.updated === "success";
 
   const workspace = await prisma.workspace.findUnique({ where: { id: session.user.workspaceId } });
   const limits = getPlanLimits(workspace);
   const usage = await getWorkspaceUsage(workspace.id);
   const isOwner = session.user.role === "OWNER";
+  const hasActiveSubscription = isSubscriptionActive(workspace);
 
+  // Already-subscribed workspaces switch plans via changePlan() (updates the
+  // existing Stripe subscription's price in place) rather than Checkout —
+  // see lib/billing.js's changePlan for why: the Customer Portal's built-in
+  // plan-switch UI doesn't work on this account despite correct config.
   async function handleUpgrade(formData) {
     "use server";
     const session = await auth();
+    const planKey = formData.get("plan");
     try {
+      if (hasActiveSubscription) {
+        await changePlan({ workspaceId: session.user.workspaceId, actingUserId: session.user.id, planKey });
+        redirect("/billing?updated=success");
+      }
       const url = await createCheckoutSession({
         workspaceId: session.user.workspaceId,
         actingUserId: session.user.id,
-        planKey: formData.get("plan"),
+        planKey,
       });
       redirect(url);
     } catch (err) {
@@ -65,8 +76,8 @@ export default async function BillingPage({ searchParams }) {
 
   return (
     <div className="container page">
-      {/* Catches the webhook-lag window between Stripe's redirect back here and the webhook actually landing — self-corrects within a couple seconds. */}
-      {checkoutStatus === "success" && <LivePoll intervalMs={2000} />}
+      {/* Catches the webhook-lag window between the redirect back here (from Checkout or an in-place plan change) and the webhook actually landing — self-corrects within a couple seconds. */}
+      {(checkoutStatus === "success" || justUpdated) && <LivePoll intervalMs={2000} />}
 
       <div className="page-head">
         <div>
@@ -77,9 +88,15 @@ export default async function BillingPage({ searchParams }) {
 
       <Toast key={errorMessage ? crypto.randomUUID() : "no-error"} message={errorMessage} type="error" />
       <Toast
-        key={checkoutStatus ? crypto.randomUUID() : "no-checkout"}
-        message={checkoutStatus === "success" ? "Subscription updated." : checkoutStatus === "cancel" ? "Checkout canceled." : null}
-        type={checkoutStatus === "success" ? "success" : "error"}
+        key={checkoutStatus || justUpdated ? crypto.randomUUID() : "no-checkout"}
+        message={
+          checkoutStatus === "success" || justUpdated
+            ? "Subscription updated."
+            : checkoutStatus === "cancel"
+              ? "Checkout canceled."
+              : null
+        }
+        type={checkoutStatus === "cancel" ? "error" : "success"}
       />
 
       <div className="card" style={{ marginBottom: 32 }}>
@@ -112,7 +129,7 @@ export default async function BillingPage({ searchParams }) {
                   <form action={handleUpgrade}>
                     <input type="hidden" name="plan" value={key} />
                     <button type="submit" className="btn btn-primary btn-block" disabled={workspace.plan === key}>
-                      {workspace.plan === key ? "Current plan" : "Upgrade"}
+                      {workspace.plan === key ? "Current plan" : hasActiveSubscription ? "Switch" : "Upgrade"}
                     </button>
                   </form>
                 </div>
