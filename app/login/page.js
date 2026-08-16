@@ -10,6 +10,7 @@ export const metadata = { title: "Log in" };
 export default async function LoginPage({ searchParams }) {
   const params = await searchParams;
   const hasError = params?.error === "1";
+  const justReset = params?.reset === "1";
 
   async function handleLogin(formData) {
     "use server";
@@ -33,7 +34,11 @@ export default async function LoginPage({ searchParams }) {
       <h1>Welcome back</h1>
       <p className="text-muted" style={{ marginTop: 6, marginBottom: 24 }}>Log in to your workspace.</p>
 
-      <Toast key={hasError ? crypto.randomUUID() : "no-error"} message={hasError ? "Invalid email or password." : null} type="error" />
+      <Toast
+        key={hasError || justReset ? crypto.randomUUID() : "no-error"}
+        message={hasError ? "Invalid email or password." : justReset ? "Password reset — log in with your new password." : null}
+        type={hasError ? "error" : "success"}
+      />
 
       <form action={handleLogin}>
         <div className="field">
@@ -47,6 +52,7 @@ export default async function LoginPage({ searchParams }) {
         <button type="submit" className="btn btn-primary btn-block">Log in</button>
       </form>
 
+      <p className="form-note"><Link href="/forgot-password">Forgot your password?</Link></p>
       <p className="form-note">Don&apos;t have an account? <Link href="/signup">Sign up</Link></p>
     </div>
   );

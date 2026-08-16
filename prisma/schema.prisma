@@ -52,6 +52,15 @@ model User {
   failedLoginAttempts Int       @default(0)
   lockedUntil         DateTime?
 
+  // Stores sha256(rawToken), never the raw token itself — same reason
+  // passwords are hashed, not stored plain. Unlike bcrypt, sha256 is
+  // deterministic, which is what makes a direct @unique lookup possible;
+  // that's fine here because the raw token is 256 bits of crypto.randomBytes,
+  // not a low-entropy human password, so sha256's speed isn't a brute-force
+  // liability the way it would be for a password column.
+  resetTokenHash      String?   @unique
+  resetTokenExpiresAt DateTime?
+
   workspaceId String
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
