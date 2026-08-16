@@ -57,12 +57,22 @@ const nextConfig = {
 // integration (not guessed), which is also why this was deliberately left
 // out when Sentry was first wired up: an invalid/missing token here can
 // hard-fail the whole build depending on plugin version, and there was
-// nothing but placeholders to give it at the time. Turbopack support
-// specifically needs @sentry/nextjs >= 9.9.0 (this app is on 10.x) and
-// Next.js >= 15.3.0-canary.8 (this app is on 16.3.0 stable) — both clear.
+// nothing but placeholders to give it at the time.
+//
+// useRunAfterProductionCompileHook is documented as defaulting to true
+// under Turbopack (uploading maps via a post-build hook rather than a
+// webpack loader, since Turbopack doesn't run webpack loaders at all) —
+// but that auto-detection didn't fire correctly in Vercel's actual build
+// environment: the build crashed *during* compilation trying to resolve
+// valueInjectionLoader.js, a webpack-only loader file, even though
+// versions otherwise meet Sentry's stated Turbopack minimums
+// (@sentry/nextjs >= 9.9.0, this app on 10.x; Next.js >= 15.3.0-canary.8,
+// this app on 16.3.0 stable). Setting it explicitly forces the correct
+// post-build-hook path instead of relying on that detection.
 export default withSentryConfig(nextConfig, {
   org: process.env.SENTRY_ORG,
   project: process.env.SENTRY_PROJECT,
   authToken: process.env.SENTRY_AUTH_TOKEN,
   silent: true,
+  useRunAfterProductionCompileHook: true,
 });
