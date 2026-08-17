@@ -7,7 +7,7 @@ billing, data handling, or ops.
 
 **Status key**: ✅ Done &nbsp;|&nbsp; 🟡 Partial &nbsp;|&nbsp; ❌ Missing
 
-Last audited: 2026-08-16.
+Last audited: 2026-08-17.
 
 ## 1. Core Product & Multi-Tenancy
 
@@ -49,7 +49,7 @@ Last audited: 2026-08-16.
 | Plan / subscription management | ✅ | `/billing` — upgrade via Checkout, manage/cancel via the Stripe Customer Portal, synced back via `app/api/webhooks/stripe`. Owner-only, re-checked server-side in `lib/billing.js`, not just hidden in the UI. |
 | Usage limits / metering | ✅ | `lib/billing.js`'s `assertCanAddMember`/`assertCanCreateProject`/`assertStorageQuota`/`assertEconomyToolEntitlement` gate member count, project count, attachment storage, and the economy tool per plan. Never retroactive — a workspace that falls below a new lower limit keeps existing data, only new creation is blocked. |
 
-Monetization is live: Free ($0: 3 members/3 projects/100MB, no economy tool), Pro ($19/mo: 10 members/20 projects/5GB, economy tool included), Business ($49/mo: unlimited members/projects, 50GB, economy tool included). **Still open**: the Stripe webhook secret needs registering against the deployed `/api/webhooks/stripe` URL before subscriptions actually sync (chicken-and-egg — the route had to exist first), and the Stripe Dashboard's Customer Portal needs "update subscription" manually enabled with both Prices allow-listed, or Pro↔Business switching won't work even though cancellation will.
+Monetization is live: Free ($0: 3 members/3 projects/100MB, no economy tool), Pro ($19/mo: 10 members/20 projects/5GB, economy tool included), Business ($49/mo: unlimited members/projects, 50GB, economy tool included). Webhook secret registered and Customer Portal configured — fully wired end-to-end, not just code-complete.
 
 ## 5. Reliability & Observability
 
@@ -72,7 +72,9 @@ Down from "nobody gets told" to "errors are caught and alerted on; a real outage
 | Environment separation | ✅ | Dedicated Neon branches per environment (`production`, `preview`, `development`, `ci`) as of 2026-08-15. |
 | CI pipeline (lint/test/build) | 🟡 | `.github/workflows/ci.yml` is live and triggers on push, but still needs `DATABASE_URL`/`AUTH_SECRET` repo secrets added before it goes green. |
 | Rollback strategy | 🟡 | Vercel supports one-click rollback to any prior deployment natively; this has not been exercised or documented as a runbook step. |
-| Dependency vulnerability scanning | ❌ | No Dependabot/Snyk config in `.github/`. |
+| Dependency vulnerability scanning | ✅ | `.github/dependabot.yml` — weekly checks on npm + github-actions, minor/patch grouped, majors surfaced individually, every PR gated by CI. |
+
+**Real incident, found and fixed this session**: adding Sentry's source-map upload (`withSentryConfig` wrapping `next.config.mjs`) silently broke every production deploy — Turbopack build crashed trying to resolve a webpack-only loader file, since Sentry's Turbopack source-map support needs `useRunAfterProductionCompileHook: true` set explicitly rather than relying on its documented "defaults true under Turbopack" auto-detection, which didn't fire correctly in Vercel's build environment. Production kept serving the last good deploy the whole time (no user-facing outage), but every deploy attempt after that commit failed until this was caught and fixed. The practical lesson: a clean local build doesn't prove a Vercel build will succeed when the failure is gated behind env vars (`SENTRY_AUTH_TOKEN`/`ORG`/`PROJECT`) that only exist on Vercel, not locally — verify build-affecting third-party config changes via an actual preview deploy, not just `npm run build`.
 
 ## 7. Testing & QA
 
@@ -116,30 +118,28 @@ Down from "nobody gets told" to "errors are caught and alerted on; a real outage
 
 Aerion Software has moved from **internal-tool-grade MVP** to **commercially sellable**: real
 multi-tenancy, tested business logic (175 tests against a real DB), error tracking + a
-health-check endpoint, self-serve password recovery, a real legal baseline, and live Stripe
-billing across 3 tiers. All four items from the previous "recommended order of attack" — legal
-pages → error tracking/health-check → password reset → billing — are done, in that order, this
-session.
+health-check endpoint, self-serve password recovery, a real legal baseline, dependency-update
+automation, and live Stripe billing across 3 tiers, fully wired end-to-end including the webhook
+and Customer Portal configuration. A production-blocking build failure (Sentry source maps vs.
+Turbopack) was also found and fixed this session — see Section 6.
 
-What's left is narrower and mostly operational rather than architectural:
+What's left is narrower and entirely operational, not architectural:
 
-1. **Billing isn't fully wired end-to-end yet** (Section 4) — the Stripe webhook secret needs
-   registering against the deployed `/api/webhooks/stripe` URL (chicken-and-egg: the route had
-   to exist and deploy first), and the Stripe Dashboard's Customer Portal needs "update
-   subscription" manually enabled with both Prices allow-listed, or plan switching silently
-   won't work even though the code is correct. Neither is a code change.
-2. **No account-recovery/legal completeness beyond the baseline** (Sections 2–3) — no email
+1. **No account-recovery/legal completeness beyond the baseline** (Sections 2–3) — no email
    verification, no 2FA, no self-serve data export or account/workspace deletion, no formal
    GDPR/CCPA cookie-consent posture. The Privacy Policy is honest about these gaps rather than
    promising them.
-3. **Observability has no external uptime watcher yet** (Section 5) — Sentry catches errors,
+2. **Observability has no external uptime watcher yet** (Section 5) — Sentry catches errors,
    but nothing is polling `/api/health` from outside the app to detect a full outage.
-4. **No E2E test suite or load testing** (Section 7) — the Vitest suite is real integration
+3. **No E2E test suite or load testing** (Section 7) — the Vitest suite is real integration
    coverage against a live DB, but there's no browser-level regression net and no data on
    concurrent-load behavior.
+4. **CI secrets still unconfirmed** (Section 6) — `DATABASE_URL`/`AUTH_SECRET` need to be set as
+   GitHub repository secrets before `.github/workflows/ci.yml` goes green; not verifiable from
+   this environment (no `gh` CLI/token), so status here is carried forward, not re-checked.
 
-None of these block charging real customers the way the original three did. Recommended next,
-roughly in order of cost-to-fix: finish the two billing operational steps above (near-zero code,
-just configuration) → account/workspace deletion + data export (the two data-protection items
-most likely to matter to an actual paying customer) → an external uptime monitor pointed at
-`/api/health`.
+None of these block charging real customers. Recommended next, roughly in order of value: an
+external uptime monitor pointed at `/api/health` (cheap, closes the last real observability gap)
+→ account/workspace deletion + data export (the two data-protection items most likely to matter
+to an actual paying customer) → a checked-in E2E suite for the flows that would hurt most if they
+silently broke (signup, login, billing checkout).
